@@ -255,6 +255,7 @@ export class EnemyRig {
     this.tellLine.position.set(0, 2.1, 1.4);
     this.tellGroup.add(this.tellGlow, this.tellLine);
     this.group.add(this.body, this.tellGroup);
+    this.body.scale.setScalar(1.12);
     this.group.rotation.y = 0;
   }
 

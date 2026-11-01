@@ -356,19 +356,26 @@ export class SpellFx {
     if (!v) {
       const g = new THREE.Group();
       const mats: THREE.MeshStandardMaterial[] = [];
-      const geo = new THREE.CylinderGeometry(0.62, 0.7, 2.8, 6);
-      for (let i = 0; i < 9; i++) {
-        const m = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0x4ea0e0, emissiveIntensity: 0.7, transparent: true, opacity: 0.6, roughness: 0.15, metalness: 0.2, flatShading: true });
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0xeaf8ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+      for (let i = 0; i < 13; i++) {
+        const row = i % 2;
+        const h = 2.4 + ((i * 7) % 5) * 0.45;
+        const geo = new THREE.CylinderGeometry(0.03, 0.5 + row * 0.1, h, 6);
+        const m = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0x4ea0e0, emissiveIntensity: 0.8, transparent: true, opacity: 0.62, roughness: 0.1, metalness: 0.3, flatShading: true });
         mats.push(m);
         const c = new THREE.Mesh(geo, m);
-        c.position.set((i - 4) * 0.95, 1.4 + ((i * 7) % 3) * 0.12, ((i % 2) - 0.5) * 0.25);
-        c.rotation.y = i;
-        c.scale.y = 0.9 + ((i * 5) % 4) * 0.1;
+        c.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
+        c.position.set((i - 6) * 0.72 + row * 0.2, h / 2, row * 0.45 - 0.2);
+        c.rotation.set(((i * 13) % 5 - 2) * 0.03, i, ((i * 11) % 5 - 2) * 0.04);
         g.add(c);
       }
       g.position.z = this.layout.zOf(p) + this.layout.fwd(p) * 2.5;
       g.scale.y = 0.01;
       this.group.add(g);
+      const base = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false }));
+      base.rotation.x = -Math.PI / 2;
+      base.position.y = 0.05;
+      g.add(base);
       v = { g, mats, grow: 0, lastHp: ward.hp };
       this.wards[p] = v;
       this.vfx.burst({ pos: new THREE.Vector3(0, 0.2, g.position.z), color: 0xbfe6ff, count: 60, speed: 2.5, life: 0.9, size: 0.12, gravity: -0.5, spread: 1 });

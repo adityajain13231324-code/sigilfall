@@ -6,7 +6,7 @@ import { ParticleVfx } from './vfx';
 import { settings } from './settings';
 
 export const LANE_SPACING = 2.4;
-export const WIZ_Z = 7.2;
+export const WIZ_Z = 5.6;
 
 const SKY_V = /* glsl */ `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
 const SKY_F = /* glsl */ `
@@ -211,17 +211,17 @@ export class World {
     const glowRune = new THREE.MeshBasicMaterial({ color: 0x7fb0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
     for (const sx of [-1, 1]) {
       const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 7.5, 8), gateMat);
-      pil.position.set(sx * 5.2, 3.75, -11.6);
+      pil.position.set(sx * 5.2, 3.75, -9.4);
       const cap = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.45, 1.5), gateMat);
-      cap.position.set(sx * 5.2, 7.6, -11.6);
+      cap.position.set(sx * 5.2, 7.6, -9.4);
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 6, 0.08), glowRune);
-      stripe.position.set(sx * 5.2, 3.8, -10.9);
+      stripe.position.set(sx * 5.2, 3.8, -8.7);
       this.scene.add(pil, cap, stripe);
     }
     const arch = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.4, 8, 32, Math.PI), gateMat);
-    arch.position.set(0, 7.7, -11.6);
+    arch.position.set(0, 7.7, -9.4);
     const archGlow = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.05, 6, 48, Math.PI), glowRune);
-    archGlow.position.set(0, 7.7, -11.1);
+    archGlow.position.set(0, 7.7, -8.9);
     this.scene.add(arch, archGlow);
 
     // braziers

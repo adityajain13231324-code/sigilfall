@@ -146,7 +146,7 @@ export class SigilPlane {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const small = Math.min(w, h) < 520;
-    this.rPx = Math.min(w, h) * (small ? 0.36 : 0.27) * settings.planeScale;
+    this.rPx = Math.min(w, h) * (small ? 0.34 : 0.24) * settings.planeScale;
     this.cx = w / 2;
     this.cy = h * (small ? 0.44 : 0.46);
     const halfH = Math.tan((this.camera.fov * Math.PI) / 360) * PLANE_DIST;
@@ -286,8 +286,8 @@ export class SigilPlane {
     this.live.mat.uniforms.uTime!.value = this.time;
     this.ghost.mat.uniforms.uTime!.value = this.time;
     this.glow += ((active ? 0.7 : 0.28) - this.glow) * Math.min(1, dt * 4);
-    this.discMat.opacity = 0.03 + this.glow * 0.07;
-    (this.rim.material as THREE.MeshBasicMaterial).opacity = 0.18 + this.glow * 0.4;
+    this.discMat.opacity = 0.012 + this.glow * 0.06;
+    (this.rim.material as THREE.MeshBasicMaterial).opacity = 0.1 + this.glow * 0.4;
     this.group.rotation.z = Math.sin(this.time * 0.4) * 0.01;
 
     if (this.ghostActive && this.ghostPts.length) {
