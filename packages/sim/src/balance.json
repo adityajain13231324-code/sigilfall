@@ -1,0 +1,49 @@
+{
+  "tickRate": 30,
+  "roundSeconds": 120,
+  "roundsToWin": 2,
+  "vitality": 100,
+  "aether": 100,
+  "aetherRegen": 8,
+  "aetherRegenPause": 0.6,
+  "poise": 40,
+  "poiseRegen": 8,
+  "poiseRegenDelay": 3,
+  "poiseAfterBreak": 25,
+  "breakSeconds": 2,
+  "breakDamageMult": 1.5,
+  "interruptPoise": 15,
+  "drawWindow": 2.0,
+  "drawGraceTicks": 6,
+  "fizzleAether": 5,
+  "fizzleRecovery": 0.3,
+  "feintAether": 6,
+  "feintRecovery": 0.2,
+  "quickCastCostMult": 1.3,
+  "tiers": {
+    "rough": { "power": 0.85, "windupAdd": 0.1, "cost": 1.0 },
+    "clean": { "power": 1.0, "windupAdd": 0.0, "cost": 1.0 },
+    "perfect": { "power": 1.1, "windupAdd": 0.0, "cost": 0.9 }
+  },
+  "recognizer": { "minScore": 0.6, "cleanScore": 0.75, "perfectScore": 0.9 },
+  "fatigue": { "costPerStack": 0.35, "powerPerStack": 0.15, "minPower": 0.4, "decaySeconds": 5 },
+  "weave": { "distinct": 3, "windowSeconds": 8, "durationSeconds": 4, "damageMult": 1.1, "regenMult": 1.25 },
+  "tide": { "everySeconds": 20, "durationSeconds": 6, "costMult": 0.7 },
+  "blink": { "aether": 8, "travel": 0.15, "invulnTicks": 6, "cooldown": 1.2 },
+  "spells": {
+    "cinder": { "aether": 10, "windup": 0.35, "cooldown": 0.8, "recovery": 0.15, "damage": 9, "poise": 4, "travel": 0.7, "burnDps": 2, "burnSeconds": 3, "wardMult": 1.5 },
+    "storm": { "aether": 22, "windup": 0.5, "cooldown": 2.0, "recovery": 0.3, "telegraph": 0.35, "damage": 16, "poise": 20, "wardPassthrough": 0.5, "thunderburnMult": 1.6, "arcStun": 0.4 },
+    "ward": { "aether": 18, "windup": 0.4, "cooldown": 6.0, "recovery": 0.25, "absorb": 30, "seconds": 4, "shardDamage": 6, "shardTravel": 0.5, "shardPoise": 2 },
+    "mirror": { "aether": 25, "windup": 0.2, "cooldown": 2.5, "veilSeconds": 0.7, "exhaustSeconds": 0.8, "exhaustAether": 10, "returnSpeed": 1.2, "prismMult": 1.5 },
+    "gravewell": { "aether": 30, "windup": 0.7, "cooldown": 10.0, "recovery": 1.0, "damage": 8, "radiusSeconds": 1.0, "wellSeconds": 1.0, "openDamageMult": 1.25 },
+    "aurum": { "aether": 20, "windup": 0.5, "cooldown": 1.0, "recovery": 0.2, "orbSeconds": 14, "damage": 14, "poise": 15, "travel": 0.45 },
+    "umbra": { "aether": 20, "windup": 0.5, "cooldown": 1.0, "recovery": 0.2, "orbSeconds": 14, "damage": 10, "poise": 3, "travel": 0.7 },
+    "eclipse": { "aether": 15, "windup": 2.5, "cooldown": 25.0, "recovery": 0.5, "damage": 55, "travel": 2.0, "trackEvery": 0.5, "trackStopTicks": 8 },
+    "orbRelease": { "recovery": 0.2 }
+  },
+  "oaths": {
+    "embers": { "burnExtra": 1, "cinderWindupLess": 0.05 },
+    "stillness": { "mirrorPenaltyMult": 0.5, "wardAbsorbExtra": 5 },
+    "echoes": { "nextCostMult": 0.8 }
+  }
+}
