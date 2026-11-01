@@ -232,7 +232,7 @@ export class World {
       mp[i * 3] = (Math.random() - 0.5) * 30; mp[i * 3 + 1] = Math.random() * 9; mp[i * 3 + 2] = (Math.random() - 0.5) * 30;
     }
     mg.setAttribute('position', new THREE.BufferAttribute(mp, 3));
-    this.motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0x9fc0ff, size: 0.07, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0x9fc0ff, size: 0.025, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.scene.add(this.motes);
 
     this.scene.add(this.vfx.group);

@@ -30,6 +30,11 @@ export interface CastRecord {
   stroke: Pt[];
 }
 
+export interface FreeMode {
+  stroke(s: Pt[], ms: number, cancelled: boolean): void;
+  blink?(dir: -1 | 1): void;
+}
+
 export interface DuelCallbacks {
   onRoundOver?: (winner: PlayerId | null, reason: string) => void;
   onPause?: () => void;
@@ -52,6 +57,9 @@ export class DuelScene {
   /** when set, casts are limited to these spells (lessons / drills) */
   onlyShapes: Shape[] | null = null;
   quickAllowed = true;
+  /** sim-less drawing (lessons, drills, tuning): strokes go to this handler instead of the duel */
+  free: FreeMode | null = null;
+  onEvent: ((e: SimEvent) => void) | null = null;
   tellsOn = true;
 
   private stroke: Pt[] = [];
@@ -190,6 +198,17 @@ export class DuelScene {
   }
 
   private drawStart(): void {
+    if (this.free) {
+      this.audio.unlock();
+      this.stroke = [];
+      this.drawAt = performance.now();
+      this.plane.begin();
+      this.plane.setColor(0x9fd0ff);
+      this.audio.play('drawStart');
+      this.trailLoop?.stop();
+      this.trailLoop = this.audio.loop('trail', { gain: 0.05 });
+      return;
+    }
     if (!this.canSend()) return;
     this.audio.unlock();
     const w = this.myWizard!;
@@ -245,6 +264,11 @@ export class DuelScene {
   private drawEnd(stroke: Pt[], cancelled: boolean): void {
     this.trailLoop?.stop();
     this.trailLoop = null;
+    if (this.free) {
+      if (stroke.length) this.free.stroke(stroke, performance.now() - this.drawAt, cancelled);
+      else this.plane.cancel();
+      return;
+    }
     const d = this.driver;
     if (!d || !this.active) {
       this.plane.cancel();
@@ -320,6 +344,10 @@ export class DuelScene {
   }
 
   private blink(visualDir: -1 | 1): void {
+    if (this.free) {
+      this.free.blink?.(visualDir);
+      return;
+    }
     if (!this.canSend()) return;
     this.audio.unlock();
     this.driver!.send({ t: 'blink', dir: (visualDir * (this.me === 0 ? 1 : -1)) as -1 | 1 });
@@ -366,6 +394,7 @@ export class DuelScene {
   }
 
   private handle(e: SimEvent, s: DuelState): void {
+    this.onEvent?.(e);
     const me = this.me;
     const world = this.world;
     const vfx = world.vfx;
@@ -792,7 +821,9 @@ export class DuelScene {
     w.camera.lookAt(0, 2.4, -8);
     this.plane.update(dt, this.input.isDrawing);
     this.enemy.update(dt, idleWizard, 0, -WIZ_Z, 0, { aurum: false, umbra: false }, false);
-    this.player.update(dt, idleWizard, null, { aurum: false, umbra: false }, 100, 100, 0);
+    let tip: THREE.Vector3 | null = null;
+    if (this.input.isDrawing && this.plane.strokeLength > 0) tip = w.camera.worldToLocal(this.plane.headWorld(this.tmp).clone());
+    this.player.update(dt, idleWizard, tip, { aurum: false, umbra: false }, 100, 100, 0);
     w.update(dt);
   }
 
