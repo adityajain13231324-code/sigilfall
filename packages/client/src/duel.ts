@@ -7,7 +7,7 @@ import {
 } from '@sigilfall/recognizer';
 import { World, WIZ_Z } from './world';
 import { SigilPlane } from './trail';
-import { EnemyRig, PlayerRig } from './rigs';
+import { EnemyRig, PlayerRig, APPRENTICE } from './rigs';
 import { Layout, SpellFx } from './spellfx';
 import { Hud } from './hud';
 import { Input } from './input';
@@ -47,6 +47,8 @@ export class DuelScene {
   readonly plane: SigilPlane;
   readonly player: PlayerRig;
   readonly enemy: EnemyRig;
+  /** the player's own wizard, only visible in third person (killcam) */
+  readonly avatar: EnemyRig;
   readonly fx: SpellFx;
   readonly hud: Hud;
   readonly input: Input;
@@ -95,7 +97,11 @@ export class DuelScene {
     this.world.camera.add(this.player.group);
     this.enemy = new EnemyRig(this.world.vfx);
     this.world.scene.add(this.enemy.group);
+    this.avatar = new EnemyRig(this.world.vfx, APPRENTICE);
+    this.avatar.group.visible = false;
+    this.world.scene.add(this.avatar.group);
     this.fx = new SpellFx(this.world, this.world.vfx, this.layout);
+    this.fx.tipOf = (p) => (this.driver && p === this.me ? this.player.tipWorld(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3()));
     this.hud = new Hud(hudRoot, captions);
     this.input = new Input(canvas.parentElement!, this.plane, {
       onDrawStart: () => this.drawStart(),
@@ -411,6 +417,22 @@ export class DuelScene {
       case 'fizzle':
         if (e.p === me) this.plane.fizzle();
         break;
+      case 'misfire': {
+        a.play('fizzle', { priority: 2 });
+        a.play('fatigueCrack');
+        const tip = e.p === me ? this.player.tipWorld(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3());
+        vfx.burst({ pos: tip, color: 0xff5a3a, count: 50, speed: 3.5, life: 0.6, size: 0.14, gravity: 2 });
+        vfx.ring(tip, 0xff5a3a, 0.1, 1.2, 0.4, 'z');
+        world.shake(e.p === me ? 0.35 : 0.1);
+        if (e.p === me) {
+          this.plane.fizzle();
+          this.hud.callout('MISFIRE', '#ff8a6a');
+          this.hud.note('Spamming the same sigil is unstable', 'warn');
+        } else {
+          this.hud.note("Corvane's spell misfires!", 'good');
+        }
+        break;
+      }
       case 'feint':
         if (e.p !== me) this.hud.note('Feint!', 'foe');
         break;
@@ -735,6 +757,8 @@ export class DuelScene {
     const holdsF = { aurum: fw.orbs.aurum > s.tick, umbra: fw.orbs.umbra > s.tick };
     const holdsM = { aurum: mw.orbs.aurum > s.tick, umbra: mw.orbs.umbra > s.tick };
     this.enemy.update(cosmeticDt, fw, this.wizX(foe, fw, viewTick), this.layout.zOf(foe), s.tick, holdsF, this.tellsOn);
+    this.avatar.group.visible = !!this.killcam;
+    if (this.killcam) this.avatar.update(cosmeticDt, mw, x, this.layout.zOf(me), s.tick, holdsM, false);
     const drawingNow = this.input.isDrawing;
     let tipLocal: THREE.Vector3 | null = null;
     if (drawingNow && this.plane.strokeLength > 0) {
@@ -744,6 +768,8 @@ export class DuelScene {
     this.player.update(cosmeticDt, mw, tipLocal, holdsM, mw.aether, mw.vit, s.tick);
     this.plane.update(dt, drawingNow);
     this.fx.update(cosmeticDt, s, viewTick);
+    this.fx.charge(me, mw.windup, s.tick, this.player.tipWorld(this.tmp).clone(), cosmeticDt);
+    this.fx.charge(foe, fw.windup, s.tick, this.enemy.tip(this.tmp).clone(), cosmeticDt);
 
     // looping audio: incoming projectiles rise in pitch as they approach (audio telegraph)
     const seen = new Set<number>();

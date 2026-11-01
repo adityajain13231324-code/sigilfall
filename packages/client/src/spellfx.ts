@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import type { DuelState, Lane, PlayerId, ProjKind, Projectile, StormStrike, Well } from '@sigilfall/sim';
+import type { DuelState, Lane, PlayerId, ProjKind, Projectile, StormStrike, Well, Windup } from '@sigilfall/sim';
+import { SPELL_INFO } from './theme';
 import type { ParticleVfx } from './vfx';
 import type { World } from './world';
 import { LANE_SPACING, WIZ_Z } from './world';
@@ -43,6 +44,7 @@ interface ProjView {
   parts: THREE.Object3D[];
   kind: ProjKind;
   last: THREE.Vector3;
+  origin: THREE.Vector3;
 }
 
 export class SpellFx {
@@ -58,6 +60,9 @@ export class SpellFx {
   private ringGeo = new THREE.RingGeometry(0.86, 1, 40);
   private outline = new THREE.MeshBasicMaterial({ color: 0x080204, side: THREE.BackSide });
   private bolts: { line: THREE.Line[]; life: number }[] = [];
+  /** world position of a wizard's wand tip: projectiles are born here and fly out */
+  tipOf: (p: PlayerId) => THREE.Vector3 = () => new THREE.Vector3(0, 1.5, 0);
+  private charges: Record<number, { g: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; ring2: THREE.Mesh; glow: THREE.Sprite } | null> = { 0: null, 1: null };
 
   constructor(private world: World, private vfx: ParticleVfx, public layout: Layout) {
     world.scene.add(this.group);
@@ -134,7 +139,7 @@ export class SpellFx {
     ring.renderOrder = 3;
     this.group.add(ring);
     this.group.add(g);
-    return { group: g, light, ring, parts, kind: pr.kind, last: new THREE.Vector3() };
+    return { group: g, light, ring, parts, kind: pr.kind, last: new THREE.Vector3(), origin: this.tipOf(pr.owner).clone() };
   }
 
   /** Called every frame with the interpolated view tick. */
@@ -151,8 +156,12 @@ export class SpellFx {
         v = this.makeProj(pr);
         this.proj.set(pr.id, v);
       }
+      const f0 = THREE.MathUtils.clamp((viewTick - pr.born) / Math.max(1, pr.arrive - pr.born), 0, 1);
+      const k = THREE.MathUtils.smoothstep(f0, 0, pr.kind === 'eclipse' ? 0.12 : 0.22);
       const pos = this.projPos(pr, viewTick, new THREE.Vector3());
+      pos.lerpVectors(v.origin, pos, k); // leaves the wand tip, then settles into its lane
       v.group.position.copy(pos);
+      const grow = 0.3 + 0.7 * k;
       const incoming = pr.owner !== me;
       const eta = Math.max(0, pr.arrive - viewTick);
       const f = 1 - eta / Math.max(1, pr.arrive - pr.born);
@@ -167,9 +176,10 @@ export class SpellFx {
       if (pr.kind === 'eclipse') {
         v.group.rotation.z += dt * 1.5;
         v.parts.forEach((p, i) => { p.rotation.x += dt * (1 + i); p.rotation.y += dt * 0.7; });
-        v.group.scale.setScalar(1 + Math.sin(this.t * 9) * 0.03);
-      } else if (pr.kind === 'shard') {
-        v.group.rotation.y += dt * 6;
+        v.group.scale.setScalar((1 + Math.sin(this.t * 9) * 0.03) * grow);
+      } else {
+        v.group.scale.setScalar(grow);
+        if (pr.kind === 'shard') v.group.rotation.y += dt * 6;
       }
       if (v.light) v.light.intensity = (pr.kind === 'eclipse' ? 3 : 2.2) * (0.8 + Math.sin(this.t * 40) * 0.2);
       // countdown ring at the landing spot
@@ -259,6 +269,43 @@ export class SpellFx {
         this.wells.delete(id);
       }
     }
+  }
+
+  /** the visible charge-up: an orb of the spell's colour condenses at the wand tip before it is released */
+  charge(p: PlayerId, wu: Windup | null, tick: number, tip: THREE.Vector3, dt: number): void {
+    let c = this.charges[p];
+    if (!wu) {
+      if (c) c.g.visible = false;
+      return;
+    }
+    if (!c) {
+      const g = new THREE.Group();
+      const core = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.05, 6, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.03, 6, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const glow = makeGlow(0xffffff, 4, 0.7);
+      g.add(core, ring, ring2, glow);
+      this.group.add(g);
+      c = { g, core, ring, ring2, glow };
+      this.charges[p] = c;
+    }
+    const info = SPELL_INFO[wu.spell];
+    const prog = THREE.MathUtils.clamp((tick - wu.start) / Math.max(1, wu.end - wu.start), 0, 1);
+    const big = wu.spell === 'eclipse' ? 3.2 : wu.spell === 'gravewell' || wu.spell === 'ward' ? 1.6 : 1;
+    const size = (0.03 + 0.15 * prog * prog) * big * (wu.misfire ? 1 + Math.sin(this.t * 60) * 0.25 : 1);
+    c.g.visible = true;
+    c.g.position.copy(tip);
+    c.core.scale.setScalar(size);
+    (c.core.material as THREE.MeshBasicMaterial).color.setHex(wu.misfire ? 0x442222 : info.color).lerp(new THREE.Color(0xffffff), 0.55);
+    c.ring.scale.setScalar(size * (1.6 - prog * 0.6));
+    c.ring2.scale.setScalar(size * (2.2 - prog * 1.1));
+    c.ring.rotation.x += dt * 5;
+    c.ring.rotation.y += dt * 3;
+    c.ring2.rotation.z -= dt * 4;
+    c.ring2.rotation.x += dt * 2;
+    for (const m of [c.ring, c.ring2]) (m.material as THREE.MeshBasicMaterial).color.setHex(info.color);
+    c.glow.material.color.setHex(info.color);
+    c.glow.scale.setScalar(size * 9 * (0.8 + Math.sin(this.t * 14) * 0.1));
   }
 
   private makeStrike(st: StormStrike) {

@@ -85,7 +85,20 @@ export class PoseState {
   }
 }
 
-/** The Hollow Magister: Corvane Vael, built from primitives. */
+export interface Palette {
+  coat: number;
+  coatEmissive: number;
+  trim: number;
+  collar: number;
+  hood: number;
+  glow: number;
+  eye: number;
+  skin: number;
+}
+export const CORVANE: Palette = { coat: 0x6a7a9c, coatEmissive: 0x1a2440, trim: 0xc9a24a, collar: 0x2d3648, hood: 0x20283a, glow: 0x8fd4ff, eye: 0x8ff6ff, skin: 0xd8d2cc };
+export const APPRENTICE: Palette = { coat: 0x2f6f78, coatEmissive: 0x0e3a40, trim: 0xe6d7a0, collar: 0x1f4a52, hood: 0x173a42, glow: 0xffd88a, eye: 0xffe6a8, skin: 0xe8c9a8 };
+
+/** A duelling wizard built from primitives. Corvane Vael (the Hollow Magister) uses CORVANE; the player's avatar uses APPRENTICE. */
 export class EnemyRig {
   readonly group = new THREE.Group();
   readonly pose = new PoseState();
@@ -96,6 +109,7 @@ export class EnemyRig {
   private wandTip = new THREE.Object3D();
   private handL = new THREE.Object3D();
   private eyeMat = new THREE.MeshBasicMaterial({ color: 0x8ff6ff });
+  private fragments: THREE.Mesh[] = [];
   private orbA = new OrbVisual('aurum', 0.16);
   private orbU = new OrbVisual('umbra', 0.16);
   private tellGroup = new THREE.Group();
@@ -109,18 +123,18 @@ export class EnemyRig {
   private taunt = 0;
   private nextTaunt = 7;
 
-  constructor(private vfx: ParticleVfx) {
-    const coat = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.9, 2.1, 10, 1), toon(0x6a7a9c, 0x1a2440, 0.35));
+  constructor(private vfx: ParticleVfx, private pal: Palette = CORVANE) {
+    const coat = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.9, 2.1, 12, 1), toon(pal.coat, pal.coatEmissive, 0.35));
     coat.position.y = 1.05;
-    const trim = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.04, 6, 24), toon(0xc9a24a, 0x6a4a10, 0.4));
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.04, 6, 24), toon(pal.trim, 0x6a4a10, 0.4));
     trim.rotation.x = Math.PI / 2;
     trim.position.y = 0.32;
-    const collar = new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.8, 8, 1, true), new THREE.MeshStandardMaterial({ color: 0x2d3648, side: THREE.DoubleSide, flatShading: true }));
+    const collar = new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.8, 8, 1, true), new THREE.MeshStandardMaterial({ color: pal.collar, side: THREE.DoubleSide, flatShading: true }));
     collar.position.y = 2.2;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 14, 12), toon(0xd8d2cc));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 14, 12), toon(pal.skin));
     head.scale.set(0.9, 1.15, 0.95);
     head.position.y = 2.38;
-    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), toon(0x20283a));
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), toon(pal.hood));
     hood.position.y = 2.46;
     hood.scale.set(1, 1.1, 1.05);
     for (const sx of [-1, 1]) {
@@ -131,12 +145,77 @@ export class EnemyRig {
     this.cape = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.9, 1, 6), new THREE.MeshStandardMaterial({ color: 0x2c3548, side: THREE.DoubleSide, flatShading: true }));
     this.cape.position.set(0, 1.2, -0.34);
     this.body.add(coat, trim, collar, head, hood, this.cape);
+    this.eyeMat.color.setHex(pal.eye);
+
+    // layered robe, belt, mantle, boots, chest sigil: more silhouette, less cone
+    const robeMat = toon(pal.coat, pal.coatEmissive, 0.25);
+    for (const [r0, r1, h, y] of [[0.5, 1.05, 0.9, 0.5], [0.4, 0.82, 0.7, 0.9]] as const) {
+      const tier = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 12, 1, true), robeMat);
+      tier.position.y = y;
+      (tier.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+      this.body.add(tier);
+    }
+    const hem = new THREE.Mesh(new THREE.TorusGeometry(1.03, 0.025, 6, 40), new THREE.MeshBasicMaterial({ color: pal.glow, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending }));
+    hem.rotation.x = Math.PI / 2;
+    hem.position.y = 0.08;
+    this.body.add(hem);
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.05, 6, 20), toon(0x2a2118));
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 1.18;
+    const buckle = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), new THREE.MeshBasicMaterial({ color: pal.glow }));
+    buckle.position.set(0, 1.18, 0.47);
+    const mantle = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), toon(pal.collar, pal.coatEmissive, 0.2));
+    mantle.scale.set(1.1, 0.55, 0.85);
+    mantle.position.y = 1.95;
+    const sigil = new THREE.Mesh(new THREE.CircleGeometry(0.15, 3), new THREE.MeshBasicMaterial({ color: pal.glow, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }));
+    sigil.position.set(0, 1.7, 0.34);
+    sigil.rotation.z = Math.PI / 2;
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 6), toon(pal === CORVANE ? 0x8a8f9e : 0x6b4a2c));
+    beard.rotation.x = Math.PI;
+    beard.position.set(0, 2.15, 0.2);
+    for (const sx of [-1, 1]) {
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.42), toon(0x15171f));
+      boot.position.set(sx * 0.28, 0.07, 0.62);
+      this.body.add(boot);
+    }
+    this.body.add(belt, buckle, mantle, sigil, beard);
+    mantle.scale.set(1.45, 0.6, 0.95);
+    if (pal === CORVANE) {
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 8), toon(pal.hood));
+      spire.position.set(0, 2.95, -0.04);
+      spire.rotation.x = -0.12;
+      this.body.add(spire);
+    } else {
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16), toon(pal.hood));
+      brim.position.set(0, 2.6, 0);
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.95, 10), toon(pal.coat, pal.coatEmissive, 0.3));
+      hat.position.set(0, 3.1, -0.05);
+      hat.rotation.x = -0.18;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.33, 0.1, 10), toon(pal.trim, 0x6a4a10, 0.4));
+      band.position.set(0, 2.66, 0);
+      this.body.add(brim, hat, band);
+    }
+    const fragMat = new THREE.MeshBasicMaterial({ color: pal.glow, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+    for (let i = 0; i < 6; i++) {
+      const f = new THREE.Mesh(new THREE.OctahedronGeometry(0.07 + (i % 3) * 0.02, 0), fragMat);
+      f.userData.a = (i / 6) * Math.PI * 2;
+      f.userData.h = 0.6 + (i % 3) * 0.55;
+      this.fragments.push(f);
+      this.body.add(f);
+    }
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45 }));
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.04;
+    const under = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.12, 40), new THREE.MeshBasicMaterial({ color: pal.glow, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    under.rotation.x = -Math.PI / 2;
+    under.position.y = 0.05;
+    this.group.add(shadow, under);
 
     // arms
     const mkArm = (g: THREE.Group, sx: number) => {
-      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.7, 7), toon(0x455268));
+      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.17, 0.7, 8), toon(pal.coat, pal.coatEmissive, 0.3));
       up.position.y = -0.35;
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), toon(0xd8d2cc));
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), toon(pal.skin));
       hand.position.y = -0.74;
       g.add(up, hand);
       g.position.set(sx * 0.5, 1.95, 0.05);
@@ -158,7 +237,7 @@ export class EnemyRig {
     this.orbA.group.visible = this.orbU.group.visible = false;
 
     // halo of broken astrolabe rings
-    const hm = new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+    const hm = new THREE.MeshBasicMaterial({ color: pal.glow, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
     [[0.75, 3.8], [0.98, 4.4], [1.22, 3.2]].forEach(([r, arc], i) => {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(r!, 0.018, 6, 48, arc), hm);
       ring.rotation.set(0.9 + i * 0.5, i * 1.1, 0);
@@ -236,6 +315,11 @@ export class EnemyRig {
     this.body.rotation.z = Math.sin(this.t * 60) * 0.03 * p.shudder + p.flinch * 0.1;
     this.body.position.z = -p.flinch * 0.25 + p.thrust * 0.18;
     this.halo.children.forEach((c) => { c.rotation.z += c.userData.sp * dt; });
+    this.fragments.forEach((f, i) => {
+      const a = f.userData.a + this.t * (0.7 + (i % 2) * 0.3);
+      f.position.set(Math.cos(a) * 1.0, f.userData.h + Math.sin(this.t * 2 + i) * 0.08, Math.sin(a) * 1.0);
+      f.rotation.set(a, a * 1.3, 0);
+    });
     this.halo.position.y = 2.55 + Math.sin(this.t * 1.2) * 0.05;
     this.cape.rotation.x = 0.1 + Math.sin(this.t * 1.7) * 0.05 - p.thrust * 0.2;
 
@@ -251,7 +335,7 @@ export class EnemyRig {
     this.armR.rotation.z = -0.1 - flourish * 0.5;
     this.armL.rotation.x = -0.1 - p.wind * 1.2 + Math.sin(this.t * 1.3 + 1) * 0.03;
     this.armL.rotation.z = 0.1 + p.wind * 0.35;
-    this.eyeMat.color.setHex(w.state === 'dead' ? 0x333333 : p.wind > 0.5 ? 0xffb347 : 0x8ff6ff);
+    this.eyeMat.color.setHex(w.state === 'dead' ? 0x333333 : p.wind > 0.5 ? 0xffb347 : this.pal.eye);
 
     // orbs
     this.orbA.group.visible = holds.aurum;

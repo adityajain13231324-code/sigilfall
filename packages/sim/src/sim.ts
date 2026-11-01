@@ -214,7 +214,12 @@ function doCast(ctx: Ctx, p: PlayerId, c: Extract<Cmd, { t: 'cast' }>): void {
   if (spell === 'cinder' && w.oath === 'embers') windSec -= bal.oaths.embers.cinderWindupLess;
   let windTicks = Math.max(2, Math.round(windSec * bal.tickRate));
   if (s.tick < w.chillUntil && spell !== 'eclipse') windTicks = Math.round(windTicks * 1.25);
-  const wu: Windup = { spell, tier, start: s.tick, end: s.tick + windTicks, power, aim: c.aim, quick };
+  // Spamming the same spell, or casting in a frantic burst, makes the charge unstable (chance-based, like a real duel)
+  const mf = bal.misfire;
+  let chance = stacks >= mf.startStacks ? mf.perStack * (stacks - mf.startStacks + 1) : 0;
+  if (w.recent.filter((r) => s.tick - r.tick <= T(mf.rapidSeconds)).length >= mf.rapidCasts) chance += mf.rapidChance;
+  const misfire = spell !== 'eclipse' && chance > 0 && rand(s) < Math.min(mf.max, chance);
+  const wu: Windup = { spell, tier, start: s.tick, end: s.tick + windTicks, power, aim: c.aim, quick, misfire };
   w.windup = wu;
   w.draw = null;
   if (spell === 'eclipse') {
@@ -247,6 +252,13 @@ function release(ctx: Ctx, p: PlayerId, wu: Windup): void {
   const ew = s.w[foe];
   const lane: Lane = wu.aim ?? ew.lane;
   const sp = wu.spell;
+  if (wu.misfire) {
+    w.windup = null;
+    ev.push({ type: 'misfire', p, spell: sp });
+    setState(w, 'staggered', s.tick + T(bal.misfire.staggerSeconds));
+    ev.push({ type: 'stagger', p, ticks: T(bal.misfire.staggerSeconds) });
+    return;
+  }
   let recovery = 'recovery' in bal.spells[sp] ? (bal.spells[sp] as { recovery: number }).recovery : 0;
   ev.push({ type: 'release', p, spell: sp, lane });
   switch (sp) {

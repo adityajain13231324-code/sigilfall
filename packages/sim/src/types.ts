@@ -67,6 +67,8 @@ export interface Windup {
   power: number;
   aim?: Lane;
   quick: boolean;
+  /** spamming makes a charge unstable: decided when cast starts, revealed when it would release */
+  misfire: boolean;
 }
 
 export interface Wizard {
@@ -122,6 +124,7 @@ export interface DuelState {
 export type SimEvent =
   | { type: 'cast'; p: PlayerId; spell: SpellId; tier: Tier; windup: number; quick: boolean }
   | { type: 'fizzle'; p: PlayerId }
+  | { type: 'misfire'; p: PlayerId; spell: SpellId }
   | { type: 'feint'; p: PlayerId }
   | { type: 'reject'; p: PlayerId; reason: RejectReason }
   | { type: 'release'; p: PlayerId; spell: SpellId; lane: Lane }

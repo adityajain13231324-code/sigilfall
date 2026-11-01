@@ -96,6 +96,8 @@ export class World {
   private rune: THREE.Mesh;
   private runeMat: THREE.MeshBasicMaterial;
   private astrolabe = new THREE.Group();
+  private braziers: { flame: THREE.Sprite; light: THREE.PointLight; seed: number }[] = [];
+  private crystals: THREE.Mesh[] = [];
   private arcs: THREE.InstancedMesh;
   private arcData: { r: number; a: number; y: number; s: number; sp: number }[] = [];
   private motes: THREE.Points;
@@ -202,6 +204,59 @@ export class World {
       c.position.set(Math.cos(a) * 12.2, h / 2, Math.sin(a) * 12.2);
       c.rotation.z = ((i % 3) - 1) * 0.04;
       this.scene.add(c);
+    }
+
+    // observatory gate framing the opposing wizard
+    const gateMat = new THREE.MeshStandardMaterial({ color: 0x4a5578, flatShading: true, roughness: 0.8 });
+    const glowRune = new THREE.MeshBasicMaterial({ color: 0x7fb0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+    for (const sx of [-1, 1]) {
+      const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 7.5, 8), gateMat);
+      pil.position.set(sx * 5.2, 3.75, -11.6);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.45, 1.5), gateMat);
+      cap.position.set(sx * 5.2, 7.6, -11.6);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 6, 0.08), glowRune);
+      stripe.position.set(sx * 5.2, 3.8, -10.9);
+      this.scene.add(pil, cap, stripe);
+    }
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.4, 8, 32, Math.PI), gateMat);
+    arch.position.set(0, 7.7, -11.6);
+    const archGlow = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.05, 6, 48, Math.PI), glowRune);
+    archGlow.position.set(0, 7.7, -11.1);
+    this.scene.add(arch, archGlow);
+
+    // braziers
+    const bowlMat = new THREE.MeshStandardMaterial({ color: 0x2a2f45, flatShading: true, roughness: 0.7 });
+    const flameTex = new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d')!; const gr = g.createRadialGradient(32, 40, 2, 32, 36, 30); gr.addColorStop(0, 'rgba(255,240,180,1)'); gr.addColorStop(0.4, 'rgba(255,140,40,0.8)'); gr.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return c; })());
+    for (const [bx, bz] of [[-8, 4], [8, 4], [-8.5, -6], [8.5, -6]] as const) {
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 1.1, 6), bowlMat);
+      stand.position.set(bx, 0.55, bz);
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.35, 8), bowlMat);
+      bowl.position.set(bx, 1.25, bz);
+      const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      flame.scale.set(1.2, 1.8, 1);
+      flame.position.set(bx, 1.95, bz);
+      const light = new THREE.PointLight(0xff9040, 6, 11, 1.8);
+      light.position.set(bx, 2, bz);
+      this.braziers.push({ flame, light, seed: bx * 3 + bz });
+      this.scene.add(stand, bowl, flame, light);
+    }
+
+    // floating crystals orbiting the astrolabe
+    const crystalMat = new THREE.MeshStandardMaterial({ color: 0x9fd0ff, emissive: 0x3a7acc, emissiveIntensity: 1.2, flatShading: true, transparent: true, opacity: 0.9 });
+    for (let i = 0; i < 9; i++) {
+      const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.6 + (i % 3) * 0.3, 0), crystalMat);
+      c.scale.y = 1.8;
+      c.userData = { a: (i / 9) * Math.PI * 2, r: 9 + (i % 3) * 3, y: 30 + (i % 4) * 2.5 };
+      this.crystals.push(c);
+      this.scene.add(c);
+    }
+
+    // inlaid platform rings
+    for (const r of [4, 8.5, 11.5]) {
+      const inlay = new THREE.Mesh(new THREE.TorusGeometry(r, 0.05, 6, 80), new THREE.MeshBasicMaterial({ color: 0x5f86d8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
+      inlay.rotation.x = Math.PI / 2;
+      inlay.position.y = 0.045;
+      this.scene.add(inlay);
     }
 
     // astrolabe
@@ -317,6 +372,17 @@ export class World {
       this.arcs.setMatrixAt(i, d.matrix);
     });
     this.arcs.instanceMatrix.needsUpdate = true;
+    for (const b of this.braziers) {
+      const f = 0.8 + Math.sin(t * 11 + b.seed) * 0.12 + Math.sin(t * 23 + b.seed * 2) * 0.08;
+      b.flame.scale.set(1.1 * f, 1.8 * f, 1);
+      b.light.intensity = 6 * f;
+    }
+    for (const c of this.crystals) {
+      const u = c.userData as { a: number; r: number; y: number };
+      const a = u.a + t * 0.08;
+      c.position.set(Math.cos(a) * u.r, u.y + Math.sin(t * 0.7 + u.a * 3) * 0.8, -30 + Math.sin(a) * u.r);
+      c.rotation.y += dt * 0.6;
+    }
     this.motes.rotation.y += dt * 0.01;
     this.motes.position.y = Math.sin(t * 0.2) * 0.3;
 

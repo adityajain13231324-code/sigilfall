@@ -27,6 +27,7 @@
   },
   "recognizer": { "minScore": 0.6, "cleanScore": 0.75, "perfectScore": 0.9 },
   "fatigue": { "costPerStack": 0.35, "powerPerStack": 0.15, "minPower": 0.4, "decaySeconds": 5 },
+  "misfire": { "startStacks": 2, "perStack": 0.18, "rapidCasts": 4, "rapidSeconds": 4, "rapidChance": 0.15, "max": 0.6, "staggerSeconds": 0.5 },
   "weave": { "distinct": 3, "windowSeconds": 8, "durationSeconds": 4, "damageMult": 1.1, "regenMult": 1.25 },
   "tide": { "everySeconds": 20, "durationSeconds": 6, "costMult": 0.7 },
   "blink": { "aether": 8, "travel": 0.15, "invulnTicks": 6, "cooldown": 1.2 },

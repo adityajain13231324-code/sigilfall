@@ -428,3 +428,55 @@ describe('match flow and determinism', () => {
 });
 
 void B;
+
+describe('spam is unreliable', () => {
+  it('repeating the same spell eventually misfires; varied casting does not', () => {
+    let misfires = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const r = new Rig(seed);
+      r.s.w[0].aether = 100;
+      for (let i = 0; i < 5; i++) {
+        r.s.w[0].aether = 100;
+        r.s.w[0].cooldowns = {};
+        r.send(0, { t: 'drawStart' });
+        r.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
+        r.run(25);
+      }
+      if (r.has('misfire')) misfires++;
+    }
+    expect(misfires).toBeGreaterThan(25);
+    const r2 = new Rig(3);
+    const spells: SpellId[] = ['cinder', 'ward', 'storm', 'mirror'];
+    for (const sp of spells) {
+      r2.s.w[0].aether = 100;
+      r2.send(0, { t: 'drawStart' });
+      r2.send(0, { t: 'cast', spell: sp, tier: 'clean' });
+      r2.until(() => r2.s.w[0].state === 'idle', 200);
+    }
+    expect(r2.has('misfire')).toBe(false);
+  });
+
+  it('a misfire wastes the cast and staggers briefly', () => {
+    const r = new Rig(1);
+    r.s.w[0].fatigue = 5;
+    r.s.w[0].lastSpell = 'cinder';
+    r.s.w[0].lastCastTick = r.s.tick;
+    r.s.rng = 1;
+    let found = false;
+    for (let t = 0; t < 30 && !found; t++) {
+      const q = new Rig(t + 50);
+      q.s.w[0].fatigue = 6;
+      q.s.w[0].lastSpell = 'cinder';
+      q.s.w[0].lastCastTick = 0;
+      q.send(0, { t: 'drawStart' });
+      q.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
+      q.run(30);
+      if (q.has('misfire')) {
+        found = true;
+        expect(q.s.projectiles.length).toBe(0);
+        expect(q.has('stagger', (e) => e.p === 0)).toBe(true);
+      }
+    }
+    expect(found).toBe(true);
+  });
+});
