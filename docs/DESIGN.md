@@ -66,6 +66,8 @@ The server ignores any spell or tier a client claims: it recognises the stroke i
 
 ## Difficulty and pacing
 
+Projectiles fly 30% slower than their listed travel times (`projectileSlow` in `balance.json`; Eclipse is unchanged), so spells read clearly and are easier to dodge. The third-person camera sits high and to the side so both wizards, the lanes and every projectile are on screen at once.
+
 The draw window is 6 s (`drawWindow`), the recogniser accepts strokes up to 7 s, and your line stays on screen while you hold. The default opponent (Gentle) reacts in 0.5-0.8 s, dodges about a fifth of the time and waits 1.5-3.3 s between casts; Adept and Archmage tighten all of those (`PROFILES` in `packages/sim/src/ai.ts`).
 
 ## Recognizer accuracy

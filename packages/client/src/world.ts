@@ -117,7 +117,7 @@ export class World {
   private quality = 1;
   private frameEma = 16;
   private slowFor = 0;
-  private baseFov = 62;
+  baseFov = 62;
   fovKick = 0;
   private pixelRatioBase: number;
 
@@ -198,7 +198,7 @@ export class World {
     const colMat = new THREE.MeshStandardMaterial({ color: 0x3a4466, flatShading: true, roughness: 0.9 });
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2 + 0.3;
-      if (Math.abs(Math.cos(a)) < 0.3 || Math.abs(Math.sin(a) + 1) < 0.35) continue;
+      if (Math.abs(Math.cos(a)) < 0.3 || Math.abs(Math.sin(a) + 1) < 0.35 || Math.sin(a) > 0.2) continue; // keep the camera side clear
       const h = 4 + (i * 37 % 7);
       const c = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, h, 7), colMat);
       c.position.set(Math.cos(a) * 12.2, h / 2, Math.sin(a) * 12.2);

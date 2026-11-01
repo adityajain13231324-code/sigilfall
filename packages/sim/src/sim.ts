@@ -237,7 +237,7 @@ function doCast(ctx: Ctx, p: PlayerId, c: Extract<Cmd, { t: 'cast' }>): void {
 function newProj(ctx: Ctx, owner: PlayerId, kind: ProjKind, lane: Lane, travelTicks: number, dmg: number, poise: number, extra: Partial<Projectile> = {}): Projectile {
   const { s, ev } = ctx;
   const pr: Projectile = {
-    id: s.nextId++, owner, kind, lane, born: s.tick, arrive: s.tick + Math.max(2, travelTicks), dmg, poise, burn: false,
+    id: s.nextId++, owner, kind, lane, born: s.tick, arrive: s.tick + Math.max(2, Math.round(travelTicks * (kind === 'eclipse' ? 1 : bal.projectileSlow))), dmg, poise, burn: false,
     pierce: false, noReflect: false, reflected: false, wide: false, chill: false, ...extra,
   };
   s.projectiles.push(pr);

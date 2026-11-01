@@ -774,7 +774,8 @@ export class DuelScene {
       world.camera.lookAt(tgt.x, 1.4, tgt.z);
     } else {
       const third = this.third;
-      if (third) world.placeThird(new THREE.Vector3(x * 0.92 + 1.25, 3.7, WIZ_Z + 5.0), new THREE.Vector3(x * 0.25 - 0.35, 1.45, -3.6));
+      world.baseFov = third ? 56 : 62;
+      if (third) world.placeThird(new THREE.Vector3(x * 0.5 + 3.4, 5.4, WIZ_Z + 8.6), new THREE.Vector3(x * 0.2 - 0.3, 1.3, -1.2));
       else world.placeCamera(x, WIZ_Z + 0.3, -6, dt);
     }
     this.player.group.visible = !this.third;

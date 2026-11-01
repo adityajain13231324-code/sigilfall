@@ -20,6 +20,7 @@
   "feintAether": 6,
   "feintRecovery": 0.2,
   "quickCastCostMult": 1.3,
+  "projectileSlow": 1.3,
   "tiers": {
     "rough": { "power": 0.85, "windupAdd": 0.1, "cost": 1.0 },
     "clean": { "power": 1.0, "windupAdd": 0.0, "cost": 1.0 },
