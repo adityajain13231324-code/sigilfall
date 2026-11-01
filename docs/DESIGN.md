@@ -100,3 +100,17 @@ The draw window is 6 s (`drawWindow`), the recogniser accepts strokes up to 7 s,
 ## Mechanic tuning notes
 
 `packages/sim/scripts/mech-stats.ts` counts how often each mechanic fires per round in AI-vs-AI play, and `packages/recognizer/scripts/tiers.ts` measures how often hand-drawn strokes score Perfect (about 60-68% for a careful hand, 39% for a shaky one, so a three-Perfect Overcharge is reachable but must be earned). Changes from the first playtest data: Perfect Dodge fired 12.7 times a round for the strongest AI because rewards chained with a Blink cooldown reset, so the reset was removed and rewards got a 4 s cooldown (now about 7); the dodge window was widened from 6 to 9 ticks and the parry window from 7 to 10 so a human can hit them; the Rift was trimmed to 4 dmg/s; the AI now actually plays the Riptide then Cinder Shatter combo (0.03 to roughly 0.3-1 per round).
+
+
+## Pacing: deliberate, not frantic
+
+Duels are meant to be read, not mashed. Rules that enforce it (all in `balance.json`):
+
+- **Commit and wait**: after any cast you recover for at least `globalCooldown` (1.5 s; 0.8 s for Ward/Aegis) and cannot draw. The sigil plane dims while you wait.
+- **Charges are longer**: windups are ×1.5 (`windupScale`); Eclipse's channel is unchanged.
+- **Aether is the leash**: costs are ×1.7 and regeneration is 5/s, so a spell every second is impossible; blink costs 10, a fizzle 8.
+- **Spam is punished**: stacked fatigue and misfire chance on top.
+- **The boss is patient**: it waits 4-7 s between actions on Gentle (about 7 casts a minute), 2.3-4.5 s on Adept (about 14), 1.3-2.8 s on Archmage (about 17), draws slowly enough for you to read its tell, and dodges are instinct but casting is deliberate. Only a real threat (an Eclipse channel, held orbs, an incoming Eclipse) makes it react immediately.
+- Rounds are 150 s; if time runs out the higher Vitality wins.
+
+`packages/sim/scripts/pace.ts` prints casts per minute and round length per difficulty.

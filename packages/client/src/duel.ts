@@ -454,7 +454,7 @@ export class DuelScene {
             this.lastRejectAt = now;
             if (!this.input.isDrawing) this.plane.unravel();
             a.play('fizzle');
-            const msg: Record<string, string> = { cooldown: 'Not ready', aether: 'Not enough Aether', orbs: 'Need both orbs', held: 'Orb already held', noOrb: 'No orb held', blink: 'No room to Blink', busy: '', late: 'Too slow' };
+            const msg: Record<string, string> = { cooldown: 'Not ready', aether: 'Not enough Aether', orbs: 'Need both orbs', held: 'Orb already held', noOrb: 'No orb held', blink: 'No room to Blink', busy: 'Let your wand settle', late: 'Too slow' };
             if (msg[e.reason]) this.hud.note(msg[e.reason]!, 'warn');
           }
         }
@@ -912,6 +912,7 @@ export class DuelScene {
       tipLocal = world.camera.worldToLocal(wp.clone());
     }
     this.player.update(cosmeticDt, mw, tipLocal, holdsM, mw.aether, mw.vit, s.tick);
+    this.plane.busy = mw.state === 'windup' || mw.state === 'recovery' || mw.state === 'staggered' || mw.state === 'exhausted' || mw.state === 'channeling';
     this.plane.update(dt, drawingNow);
     this.fx.update(cosmeticDt, s, viewTick);
     this.fx.charge(me, mw.windup, s.tick, this.myTip(this.tmp).clone(), cosmeticDt);
@@ -1016,7 +1017,7 @@ export class DuelScene {
 const idleWizard = ((): Wizard => {
   return {
     vit: 100, aether: 100, poise: 40, lane: 1, state: 'idle', stateUntil: 0, oath: null, windup: null, draw: null, cooldowns: {}, blinkReady: 0,
-    blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0, lastHit: 0, brokenUntil: 0, openUntil: 0, orbs: { aurum: 0, umbra: 0 }, ward: null,
+    blinkFrom: 1, blinkStart: -999, perfectReady: 0, blinkTo: 1, invulnUntil: 0, regenFrom: 0, lastHit: 0, brokenUntil: 0, openUntil: 0, orbs: { aurum: 0, umbra: 0 }, ward: null,
     mirror: null, burnUntil: 0, burnPhase: 0, aegisUntil: 0, focusUntil: 0, streak: 0, overcharge: false, heal: null, chillUntil: 0, lastSpell: null, lastCastTick: 0, fatigue: 0, recent: [], weaveUntil: 0, echoNext: false,
     casts: 0, stats: { damageDealt: 0, casts: {} },
   };

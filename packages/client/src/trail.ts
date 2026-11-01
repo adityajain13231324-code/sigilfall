@@ -100,6 +100,8 @@ export class SigilPlane {
   private discMat: THREE.MeshBasicMaterial;
   private pts: { x: number; y: number; t: number; w: number }[] = [];
   phase: Phase = 'idle';
+  /** wand is recovering after a cast: the plane dims until you may draw again */
+  busy = false;
   private phaseT = 0;
   private holdFor = 0;
   private time = 0;
@@ -292,7 +294,7 @@ export class SigilPlane {
     this.time += dt;
     this.live.mat.uniforms.uTime!.value = this.time;
     this.ghost.mat.uniforms.uTime!.value = this.time;
-    this.glow += ((active ? 0.7 : 0.28) - this.glow) * Math.min(1, dt * 4);
+    this.glow += ((active ? 0.7 : this.busy ? 0.0 : 0.28) - this.glow) * Math.min(1, dt * 4);
     this.discMat.opacity = 0.012 + this.glow * 0.06;
     (this.rim.material as THREE.MeshBasicMaterial).opacity = 0.1 + this.glow * 0.4;
     this.group.rotation.z = Math.sin(this.time * 0.4) * 0.01;

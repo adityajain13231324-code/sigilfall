@@ -1,10 +1,10 @@
 {
   "tickRate": 30,
-  "roundSeconds": 120,
+  "roundSeconds": 150,
   "roundsToWin": 2,
   "vitality": 100,
   "aether": 100,
-  "aetherRegen": 8,
+  "aetherRegen": 5,
   "aetherRegenPause": 0.6,
   "poise": 50,
   "poiseRegen": 8,
@@ -15,46 +15,261 @@
   "interruptPoise": 15,
   "drawWindow": 6.0,
   "drawGraceTicks": 10,
-  "fizzleAether": 5,
+  "fizzleAether": 8,
   "fizzleRecovery": 0.3,
   "feintAether": 6,
   "feintRecovery": 0.2,
   "quickCastCostMult": 1.3,
   "projectileSlow": 1.3,
-  "mechanics": { "focusSeconds": 3, "focusWindupMult": 0.7, "perfectDodgeAether": 14, "overchargeStreak": 3, "overchargeMult": 1.35, "parryTicks": 10, "perfectDodgeTicks": 9, "perfectDodgeCooldown": 4, "parryMult": 1.4, "parryAether": 10, "counterHitMult": 1.2 },
-  "arena": { "firstHazard": 14, "hazardEvery": 20, "hazardWarn": 1.4, "hazardSeconds": 5, "hazardDps": 4, "firstCrystal": 7, "crystalEvery": 12, "crystalSeconds": 8, "crystalAether": 25, "crystalVit": 6, "shatterMult": 1.3 },
-  "tiers": {
-    "rough": { "power": 0.85, "windupAdd": 0.1, "cost": 1.0 },
-    "clean": { "power": 1.0, "windupAdd": 0.0, "cost": 1.0 },
-    "perfect": { "power": 1.1, "windupAdd": 0.0, "cost": 0.9 }
+  "mechanics": {
+    "focusSeconds": 3,
+    "focusWindupMult": 0.7,
+    "perfectDodgeAether": 14,
+    "overchargeStreak": 3,
+    "overchargeMult": 1.35,
+    "parryTicks": 10,
+    "perfectDodgeTicks": 9,
+    "perfectDodgeCooldown": 4,
+    "parryMult": 1.4,
+    "parryAether": 10,
+    "counterHitMult": 1.2
   },
-  "recognizer": { "minScore": 0.6, "cleanScore": 0.75, "perfectScore": 0.9 },
-  "fatigue": { "costPerStack": 0.35, "powerPerStack": 0.15, "minPower": 0.4, "decaySeconds": 5 },
-  "misfire": { "startStacks": 2, "perStack": 0.18, "rapidCasts": 4, "rapidSeconds": 4, "rapidChance": 0.15, "max": 0.6, "staggerSeconds": 0.5 },
-  "weave": { "distinct": 3, "windowSeconds": 8, "durationSeconds": 4, "damageMult": 1.1, "regenMult": 1.25 },
-  "tide": { "everySeconds": 20, "durationSeconds": 6, "costMult": 0.7 },
-  "blink": { "aether": 8, "travel": 0.15, "invulnTicks": 6, "cooldown": 1.2 },
+  "arena": {
+    "firstHazard": 14,
+    "hazardEvery": 20,
+    "hazardWarn": 1.4,
+    "hazardSeconds": 5,
+    "hazardDps": 4,
+    "firstCrystal": 7,
+    "crystalEvery": 12,
+    "crystalSeconds": 8,
+    "crystalAether": 25,
+    "crystalVit": 6,
+    "shatterMult": 1.3
+  },
+  "tiers": {
+    "rough": {
+      "power": 0.85,
+      "windupAdd": 0.1,
+      "cost": 1.0
+    },
+    "clean": {
+      "power": 1.0,
+      "windupAdd": 0.0,
+      "cost": 1.0
+    },
+    "perfect": {
+      "power": 1.1,
+      "windupAdd": 0.0,
+      "cost": 0.9
+    }
+  },
+  "recognizer": {
+    "minScore": 0.6,
+    "cleanScore": 0.75,
+    "perfectScore": 0.9
+  },
+  "fatigue": {
+    "costPerStack": 0.35,
+    "powerPerStack": 0.15,
+    "minPower": 0.4,
+    "decaySeconds": 5
+  },
+  "misfire": {
+    "startStacks": 2,
+    "perStack": 0.18,
+    "rapidCasts": 4,
+    "rapidSeconds": 4,
+    "rapidChance": 0.15,
+    "max": 0.6,
+    "staggerSeconds": 0.5
+  },
+  "weave": {
+    "distinct": 3,
+    "windowSeconds": 8,
+    "durationSeconds": 4,
+    "damageMult": 1.1,
+    "regenMult": 1.25
+  },
+  "tide": {
+    "everySeconds": 20,
+    "durationSeconds": 6,
+    "costMult": 0.7
+  },
+  "blink": {
+    "aether": 10,
+    "travel": 0.15,
+    "invulnTicks": 6,
+    "cooldown": 1.2
+  },
   "spells": {
-    "cinder": { "aether": 10, "windup": 0.35, "cooldown": 0.8, "recovery": 0.15, "damage": 9, "poise": 4, "travel": 0.7, "burnDps": 1.5, "burnSeconds": 2.5, "wardMult": 1.5 },
-    "storm": { "aether": 22, "windup": 0.5, "cooldown": 2.5, "recovery": 0.3, "telegraph": 0.55, "damage": 16, "poise": 16, "wardPassthrough": 0.5, "thunderburnMult": 1.6, "arcStun": 0.4 },
-    "ward": { "aether": 18, "windup": 0.4, "cooldown": 6.0, "recovery": 0.25, "absorb": 30, "seconds": 4, "shardDamage": 6, "shardTravel": 0.5, "shardPoise": 2 },
-    "mirror": { "aether": 25, "windup": 0.2, "cooldown": 2.5, "veilSeconds": 0.7, "exhaustSeconds": 0.8, "exhaustAether": 10, "returnSpeed": 1.2, "prismMult": 1.5 },
-    "gravewell": { "aether": 30, "windup": 0.7, "cooldown": 10.0, "recovery": 1.0, "damage": 8, "radiusSeconds": 1.0, "wellSeconds": 1.0, "openDamageMult": 1.25 },
-    "aurum": { "aether": 16, "windup": 0.5, "cooldown": 1.0, "recovery": 0.2, "orbSeconds": 14, "damage": 18, "poise": 15, "travel": 0.45 },
-    "umbra": { "aether": 16, "windup": 0.5, "cooldown": 1.0, "recovery": 0.2, "orbSeconds": 14, "damage": 12, "poise": 3, "travel": 0.7 },
-    "eclipse": { "aether": 15, "windup": 2.5, "cooldown": 25.0, "recovery": 0.5, "damage": 55, "travel": 2.0, "trackEvery": 0.5, "trackStopTicks": 8 },
-    "dart": { "aether": 7, "windup": 0.2, "cooldown": 0.6, "recovery": 0.1, "damage": 7, "poise": 1, "travel": 0.4 },
-    "riptide": { "aether": 11, "windup": 0.35, "cooldown": 1.5, "recovery": 0.15, "damage": 9, "poise": 3, "travel": 0.6, "chillSeconds": 3 },
-    "heal": { "aether": 24, "windup": 0.6, "cooldown": 14.0, "recovery": 0.4, "amount": 16, "seconds": 2 },
-    "aegis": { "aether": 20, "windup": 0.3, "cooldown": 9.0, "recovery": 0.2, "seconds": 4, "damageMult": 0.6, "poiseMult": 0.5 },
-    "crescent": { "aether": 14, "windup": 0.4, "cooldown": 2.0, "recovery": 0.2, "damage": 12, "poise": 6, "travel": 0.65 },
-    "starfall": { "aether": 30, "windup": 0.7, "cooldown": 9.0, "recovery": 0.4, "damage": 12, "poise": 5, "telegraph": 0.5, "gap": 0.3 },
-    "fangs": { "aether": 15, "windup": 0.4, "cooldown": 2.5, "recovery": 0.2, "damage": 8, "poise": 2, "travel": 0.6, "travel2": 0.85 },
-    "orbRelease": { "recovery": 0.2 }
+    "cinder": {
+      "aether": 17,
+      "windup": 0.35,
+      "cooldown": 0.8,
+      "recovery": 0.15,
+      "damage": 9,
+      "poise": 4,
+      "travel": 0.7,
+      "burnDps": 1.5,
+      "burnSeconds": 2.5,
+      "wardMult": 1.5
+    },
+    "storm": {
+      "aether": 37,
+      "windup": 0.5,
+      "cooldown": 2.5,
+      "recovery": 0.3,
+      "telegraph": 0.55,
+      "damage": 16,
+      "poise": 16,
+      "wardPassthrough": 0.5,
+      "thunderburnMult": 1.6,
+      "arcStun": 0.4
+    },
+    "ward": {
+      "aether": 31,
+      "windup": 0.4,
+      "cooldown": 6.0,
+      "recovery": 0.25,
+      "absorb": 30,
+      "seconds": 4,
+      "shardDamage": 6,
+      "shardTravel": 0.5,
+      "shardPoise": 2
+    },
+    "mirror": {
+      "aether": 42,
+      "windup": 0.2,
+      "cooldown": 2.5,
+      "veilSeconds": 0.7,
+      "exhaustSeconds": 0.8,
+      "exhaustAether": 10,
+      "returnSpeed": 1.2,
+      "prismMult": 1.5
+    },
+    "gravewell": {
+      "aether": 51,
+      "windup": 0.7,
+      "cooldown": 10.0,
+      "recovery": 1.0,
+      "damage": 8,
+      "radiusSeconds": 1.0,
+      "wellSeconds": 1.0,
+      "openDamageMult": 1.25
+    },
+    "aurum": {
+      "aether": 27,
+      "windup": 0.5,
+      "cooldown": 1.0,
+      "recovery": 0.2,
+      "orbSeconds": 14,
+      "damage": 18,
+      "poise": 15,
+      "travel": 0.45
+    },
+    "umbra": {
+      "aether": 27,
+      "windup": 0.5,
+      "cooldown": 1.0,
+      "recovery": 0.2,
+      "orbSeconds": 14,
+      "damage": 12,
+      "poise": 3,
+      "travel": 0.7
+    },
+    "eclipse": {
+      "aether": 20,
+      "windup": 2.5,
+      "cooldown": 25.0,
+      "recovery": 0.5,
+      "damage": 55,
+      "travel": 2.0,
+      "trackEvery": 0.5,
+      "trackStopTicks": 8
+    },
+    "dart": {
+      "aether": 12,
+      "windup": 0.2,
+      "cooldown": 0.6,
+      "recovery": 0.1,
+      "damage": 7,
+      "poise": 1,
+      "travel": 0.4
+    },
+    "riptide": {
+      "aether": 19,
+      "windup": 0.35,
+      "cooldown": 1.5,
+      "recovery": 0.15,
+      "damage": 9,
+      "poise": 3,
+      "travel": 0.6,
+      "chillSeconds": 3
+    },
+    "heal": {
+      "aether": 41,
+      "windup": 0.6,
+      "cooldown": 14.0,
+      "recovery": 0.4,
+      "amount": 16,
+      "seconds": 2
+    },
+    "aegis": {
+      "aether": 34,
+      "windup": 0.3,
+      "cooldown": 9.0,
+      "recovery": 0.2,
+      "seconds": 4,
+      "damageMult": 0.6,
+      "poiseMult": 0.5
+    },
+    "crescent": {
+      "aether": 24,
+      "windup": 0.4,
+      "cooldown": 2.0,
+      "recovery": 0.2,
+      "damage": 12,
+      "poise": 6,
+      "travel": 0.65
+    },
+    "starfall": {
+      "aether": 51,
+      "windup": 0.7,
+      "cooldown": 9.0,
+      "recovery": 0.4,
+      "damage": 12,
+      "poise": 5,
+      "telegraph": 0.5,
+      "gap": 0.3
+    },
+    "fangs": {
+      "aether": 26,
+      "windup": 0.4,
+      "cooldown": 2.5,
+      "recovery": 0.2,
+      "damage": 8,
+      "poise": 2,
+      "travel": 0.6,
+      "travel2": 0.85
+    },
+    "orbRelease": {
+      "recovery": 0.2
+    }
   },
   "oaths": {
-    "embers": { "burnExtra": 1, "cinderWindupLess": 0.05 },
-    "stillness": { "mirrorPenaltyMult": 0.5, "wardAbsorbExtra": 5 },
-    "echoes": { "nextCostMult": 0.8 }
-  }
+    "embers": {
+      "burnExtra": 1,
+      "cinderWindupLess": 0.05
+    },
+    "stillness": {
+      "mirrorPenaltyMult": 0.5,
+      "wardAbsorbExtra": 5
+    },
+    "echoes": {
+      "nextCostMult": 0.8
+    }
+  },
+  "globalCooldown": 1.5,
+  "windupScale": 1.5
 }

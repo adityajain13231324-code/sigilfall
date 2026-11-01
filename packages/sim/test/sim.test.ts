@@ -329,7 +329,7 @@ describe('anti-spam systems', () => {
     r.cast(0, 'cinder', 'clean');
     r.wait(0);
     r.run(T(5) + 5);
-    expect(spellCost(r.s, 0, 'cinder', 'clean')).toBeCloseTo(10, 5);
+    expect(spellCost(r.s, 0, 'cinder', 'clean')).toBeCloseTo(B.spells.cinder.aether, 5);
   });
 
   it('Spellweave rewards three different spells in 8 seconds', () => {
@@ -346,7 +346,7 @@ describe('anti-spam systems', () => {
 
   it('Perfect tier is cheaper, Rough has a longer windup', () => {
     const r = new Rig();
-    expect(spellCost(r.s, 0, 'cinder', 'perfect')).toBeCloseTo(9, 5);
+    expect(spellCost(r.s, 0, 'cinder', 'perfect')).toBeCloseTo(B.spells.cinder.aether * 0.9, 5);
     r.send(0, { t: 'drawStart' });
     const rough = r.send(0, { t: 'cast', spell: 'cinder', tier: 'rough' }).find((e) => e.type === 'cast') as any;
     const r2 = new Rig();
@@ -440,7 +440,7 @@ describe('spam is unreliable', () => {
         r.s.w[0].cooldowns = {};
         r.send(0, { t: 'drawStart' });
         r.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
-        r.run(25);
+        r.until(() => r.s.w[0].state === 'idle', 300);
       }
       if (r.has('misfire')) misfires++;
     }
@@ -631,7 +631,7 @@ describe('skill mechanics', () => {
     r.s.w[1].state = 'idle';
     r.send(1, { t: 'drawStart' });
     const ev = r.send(1, { t: 'cast', spell: 'cinder', tier: 'clean' }).find((e) => e.type === 'cast') as any;
-    expect(ev.windup).toBeLessThan(10);
+    expect(ev.windup).toBeLessThan(Math.round(B.spells.cinder.windup * 30 * B.windupScale)); // shorter than an unfocused cinder
   });
 
   it('an early Blink is an ordinary dodge, not a Perfect one', () => {
@@ -647,7 +647,7 @@ describe('skill mechanics', () => {
     const r = new Rig();
     r.cast(0, 'cinder', 'clean');
     // raise the veil so its first ticks line up with the bolt's arrival
-    r.until(() => r.s.projectiles[0]!.arrive - r.s.tick <= 9);
+    r.until(() => r.s.projectiles[0]!.arrive - r.s.tick <= 17);
     r.send(1, { t: 'drawStart' });
     r.send(1, { t: 'cast', spell: 'mirror', tier: 'clean' });
     r.until(() => r.has('reflect') || r.s.projectiles.length === 0, 60);

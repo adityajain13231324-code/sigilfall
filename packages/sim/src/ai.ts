@@ -20,9 +20,9 @@ interface Profile {
 }
 
 export const PROFILES: Record<Difficulty, Profile> = {
-  apprentice: { react: [14, 24], fizzle: 0.24, feint: 0, drawMult: 1.8, adapt: 0, blinkSkill: 0.22, counterSkill: 0.04, eclipseAmbition: 0.04, tiers: [0.5, 0.45, 0.05], noise: 0.6, tempo: [45, 100] },
-  adept: { react: [8, 13], fizzle: 0.08, feint: 0.03, drawMult: 1.1, adapt: 0.6, blinkSkill: 0.62, counterSkill: 0.4, eclipseAmbition: 0.4, tiers: [0.15, 0.6, 0.25], noise: 0.3, tempo: [18, 50] },
-  archmage: { react: [4, 7], fizzle: 0.025, feint: 0.16, drawMult: 0.8, adapt: 1, blinkSkill: 0.93, counterSkill: 0.85, eclipseAmbition: 0.9, tiers: [0.05, 0.5, 0.45], noise: 0.18, tempo: [4, 18] },
+  apprentice: { react: [14, 24], fizzle: 0.24, feint: 0, drawMult: 2.6, adapt: 0, blinkSkill: 0.22, counterSkill: 0.04, eclipseAmbition: 0.04, tiers: [0.5, 0.45, 0.05], noise: 0.6, tempo: [120, 210] },
+  adept: { react: [8, 13], fizzle: 0.08, feint: 0.03, drawMult: 1.7, adapt: 0.6, blinkSkill: 0.62, counterSkill: 0.4, eclipseAmbition: 0.4, tiers: [0.15, 0.6, 0.25], noise: 0.3, tempo: [70, 135] },
+  archmage: { react: [4, 7], fizzle: 0.025, feint: 0.16, drawMult: 1.3, adapt: 1, blinkSkill: 0.93, counterSkill: 0.85, eclipseAmbition: 0.9, tiers: [0.05, 0.5, 0.45], noise: 0.18, tempo: [40, 85] },
 };
 
 const DRAW_TICKS: Record<SpellId, number> = { cinder: 13, storm: 15, ward: 13, mirror: 14, gravewell: 27, aurum: 17, umbra: 17, eclipse: 29, dart: 10, riptide: 14, heal: 20, aegis: 14, crescent: 16, starfall: 24, fangs: 20 };
@@ -149,8 +149,8 @@ export class WizardAI implements Bot {
       }
     }
     if (w.state !== 'idle') return cmds;
-    if (s.tick < this.nextThink) return cmds;
-    this.nextThink = s.tick + 1;
+    const thinking = s.tick >= this.nextThink; // dodging is instinct; casting is deliberate
+    if (thinking) this.nextThink = s.tick + 1;
 
     // 0. arena: leave a burning lane, drift toward a crystal
     const move = this.arenaMove(s);
@@ -167,6 +167,9 @@ export class WizardAI implements Bot {
         return cmds;
       }
     }
+    const fw0 = s.w[other(me)];
+    const urgent = fw0.state === 'channeling' || hasBothOrbs(s, other(me)) || s.projectiles.some((pr) => pr.owner !== me && pr.kind === 'eclipse');
+    if (!thinking && !urgent) return cmds; // a big threat overrides patience
     // 2. counters
     const counter = this.pickCounter(s, cmds);
     if (counter) return cmds;

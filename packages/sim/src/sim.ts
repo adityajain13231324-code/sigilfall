@@ -232,7 +232,7 @@ function doCast(ctx: Ctx, p: PlayerId, c: Extract<Cmd, { t: 'cast' }>): void {
   }
   let windSec = bal.spells[spell].windup + bal.tiers[tier].windupAdd;
   if (spell === 'cinder' && w.oath === 'embers') windSec -= bal.oaths.embers.cinderWindupLess;
-  let windTicks = Math.max(2, Math.round(windSec * bal.tickRate));
+  let windTicks = Math.max(2, Math.round(windSec * bal.tickRate * (spell === 'eclipse' ? 1 : bal.windupScale)));
   if (s.tick < w.chillUntil && spell !== 'eclipse') windTicks = Math.round(windTicks * 1.25);
   if (s.tick < w.focusUntil && spell !== 'eclipse') windTicks = Math.max(2, Math.round(windTicks * bal.mechanics.focusWindupMult));
   // Spamming the same spell, or casting in a frantic burst, makes the charge unstable (chance-based, like a real duel)
@@ -389,6 +389,7 @@ function release(ctx: Ctx, p: PlayerId, wu: Windup): void {
     }
   }
   w.windup = null;
+  if (sp !== 'mirror') recovery = Math.max(recovery, sp === 'ward' || sp === 'aegis' ? bal.globalCooldown * 0.55 : bal.globalCooldown); // commit, then wait
   if (recovery > 0) setState(w, 'recovery', s.tick + T(recovery));
   else setState(w, 'idle', 0);
 }
