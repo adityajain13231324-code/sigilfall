@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "client", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--host", "127.0.0.1"], "port": 5173 }
+  ]
+}

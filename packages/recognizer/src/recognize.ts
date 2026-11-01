@@ -304,3 +304,48 @@ export function validateTemplates(raw: unknown): Template[] {
   }
   return out;
 }
+
+// ---- partial-stroke prediction (drives opponent "tells") ----------------------------------------
+
+import { canonical } from './shapes';
+
+function boxNormalize(pts: Pt[]): Pt[] {
+  const b = bounds(pts);
+  const s = Math.max(b.w, b.h) || 1;
+  return pts.map((p) => ({ x: (p.x - b.minX) / s, y: (p.y - b.minY) / s }));
+}
+
+let prefixCache: { spell: SpellId; shape: Shape; full: Pt[] }[] | null = null;
+
+/**
+ * Guess which sigil an unfinished stroke is heading toward, and roughly how complete it is.
+ * Deliberately coarse: it is allowed to be wrong, which is what makes feints work.
+ */
+export function predictPrefix(stroke: Pt[], allowed: Shape[] = SHAPES): { spell: SpellId; frac: number; dist: number } | null {
+  if (stroke.length < 6) return null;
+  const b = bounds(stroke);
+  if (Math.max(b.w, b.h) < 60) return null;
+  if (!prefixCache) {
+    prefixCache = [];
+    for (const shape of SHAPES) {
+      const handed = shape === 'circle' || shape === 'spiral' || shape === 'infinity';
+      for (const w of handed ? (['cw', 'ccw'] as const) : (['cw'] as const)) {
+        prefixCache.push({ spell: shapeToSpell(shape, w), shape, full: canonical(shape, w) });
+      }
+    }
+  }
+  const part = boxNormalize(resample(stroke, 14));
+  let best: { spell: SpellId; frac: number; dist: number } | null = null;
+  for (const c of prefixCache) {
+    if (!allowed.includes(c.shape)) continue;
+    for (let f = 0.3; f <= 1.001; f += 0.1) {
+      const n = Math.max(6, Math.ceil(c.full.length * f));
+      const pre = boxNormalize(resample(c.full.slice(0, n), 14));
+      let d = 0;
+      for (let i = 0; i < 14; i++) d += Math.hypot(pre[i]!.x - part[i]!.x, pre[i]!.y - part[i]!.y);
+      d /= 14;
+      if (!best || d < best.dist) best = { spell: c.spell, frac: f, dist: d };
+    }
+  }
+  return best && best.dist < 0.2 ? best : null;
+}
