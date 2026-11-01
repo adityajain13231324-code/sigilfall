@@ -17,6 +17,9 @@ export interface AppApi {
   clear(): void;
   runDuel(driver: Driver, opts?: { enemyName?: string; online?: boolean }): void;
   toast(text: string, ms?: number): void;
+  oathDraft(cb: (o: Oath) => void, title?: string): void;
+  pause(): void;
+  quit(): void;
 }
 
 const stats = store('stats.v1', { wins: 0, losses: 0, rounds: 0 });
