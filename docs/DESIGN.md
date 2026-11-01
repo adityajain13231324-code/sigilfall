@@ -12,6 +12,13 @@
 | Aurum Orb | 20 | 0.5 s | 1 s | orb for 14 s; `Q` fires Knockback Blast (14 dmg, 15 Poise, shoves a lane, cancels a draw) |
 | Umbra Orb | 20 | 0.5 s | 1 s | orb for 14 s; `E` fires Pull Lance (10 dmg, drags enemy projectiles to another lane) |
 | Eclipse Rend | 15 + 2 orbs | 2.5 s channel | 25 s | 55 dmg + Poise break, 2 s travel, slow lane tracking, not reflectable, annihilates Ward |
+| Piercing Dart | 8 | 0.2 s | 0.6 s | 6 dmg, 0.4 s travel, pierces Ward |
+| Riptide Lash | 14 | 0.35 s | 1.5 s | 7 dmg, Chill 3 s (casting 25% slower) |
+| Mending Light | 24 | 0.6 s | 12 s | +24 Vitality over 2 s, cures Burn |
+| Aegis | 20 | 0.3 s | 9 s | 4 s of −40% damage and −50% Poise damage |
+| Moonblade | 16 | 0.4 s | 2 s | 10 dmg, 6 Poise, hits lane ±1 |
+| Starfall | 30 | 0.7 s | 9 s | 3 meteors (9 dmg + short Burn) at 0.5 s, 0.8 s, 1.1 s, one per lane, absorbed by Ward |
+| Twin Fangs | 18 | 0.4 s | 2.5 s | two 6 dmg projectiles in different lanes, 0.6 s and 0.85 s |
 
 Resources: Vitality 100, Aether 100 (+8/s, paused 0.6 s after casting), Poise 40 (break = 2 s stagger, ×1.5 damage, resets to 25). Blink: 8 Aether, 0.15 s, 6 ticks of invulnerability, 1.2 s cooldown.
 
@@ -54,6 +61,14 @@ The server ignores any spell or tier a client claims: it recognises the stroke i
 ## Balance evidence
 
 `npm run sim:balance` (1000 Adept-vs-Adept rounds): no spell above ~40% of casts, seat win rate ≈ 50/50; an Eclipse-only strategy wins 0 of 200 against a basic counter-playing AI. Both are asserted in `packages/sim/test/balance.test.ts`.
+
+## Difficulty and pacing
+
+The draw window is 6 s (`drawWindow`), the recogniser accepts strokes up to 7 s, and your line stays on screen while you hold. The default opponent (Gentle) reacts in 0.5-0.8 s, dodges about a fifth of the time and waits 1.5-3.3 s between casts; Adept and Archmage tighten all of those (`PROFILES` in `packages/sim/src/ai.ts`).
+
+## Recognizer accuracy
+
+15 sigils (14 shapes; the circle is Aurum or Umbra by direction). `npm test` asserts at least 95% correct and under 1% wrong-spell casts on 200 noisy samples per spell, plus adversarial scribbles, tiny strokes, lines and double taps. Hard cases are separated with geometry the point cloud cannot see: tangent turning, closure, corner count, roundness, solidity (heart notch), and bounding-box corner proximity (square vs diamond).
 
 ## Known limits
 

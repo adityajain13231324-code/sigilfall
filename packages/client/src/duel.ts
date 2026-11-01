@@ -16,7 +16,7 @@ import type { Driver } from './driver';
 import { settings } from './settings';
 import { SPELL_INFO } from './theme';
 
-const SCHOOL: Record<SpellId, string> = { cinder: 'fire', storm: 'storm', ward: 'ice', mirror: 'mirror', gravewell: 'grav', aurum: 'orb', umbra: 'orb', eclipse: 'eclipse' };
+const SCHOOL: Record<SpellId, string> = { cinder: 'fire', storm: 'storm', ward: 'ice', mirror: 'mirror', gravewell: 'grav', aurum: 'orb', umbra: 'orb', eclipse: 'eclipse', dart: 'storm', riptide: 'ice', heal: 'orb', aegis: 'ice', crescent: 'mirror', starfall: 'fire', fangs: 'fire' };
 const WHY: Record<string, string> = {
   tooShort: 'Draw a longer stroke', tooSmall: 'Draw bigger', tooSlow: 'Too slow', line: 'Not a sigil', scribble: 'Too shaky', noMatch: 'No sigil recognised',
   smudged: 'Smudged sigil', notReady: 'Not ready',
@@ -101,7 +101,7 @@ export class DuelScene {
     this.avatar.group.visible = false;
     this.world.scene.add(this.avatar.group);
     this.fx = new SpellFx(this.world, this.world.vfx, this.layout);
-    this.fx.tipOf = (p) => (this.driver && p === this.me ? this.player.tipWorld(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3()));
+    this.fx.tipOf = (p) => (this.driver && p === this.me ? this.myTip(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3()));
     this.hud = new Hud(hudRoot, captions);
     this.input = new Input(canvas.parentElement!, this.plane, {
       onDrawStart: () => this.drawStart(),
@@ -185,6 +185,15 @@ export class DuelScene {
     this.channelLoop = null;
     for (const l of this.projLoops.values()) l.h.stop();
     this.projLoops.clear();
+  }
+
+  private get third(): boolean {
+    return settings.view === 'third' && !!this.driver;
+  }
+
+  /** world position of my wand tip: the avatar's in third person, the first-person wand otherwise */
+  private myTip(out: THREE.Vector3): THREE.Vector3 {
+    return this.third ? this.avatar.tip(out) : this.player.tipWorld(out);
   }
 
   get me(): PlayerId {
@@ -386,7 +395,7 @@ export class DuelScene {
 
   /** a point on a wizard's body in world space (for hit effects) */
   bodyPos(p: PlayerId, lane: number, y = 1.5): THREE.Vector3 {
-    return new THREE.Vector3(this.layout.laneX(lane), y, this.layout.zOf(p) + (p === this.me ? -0.8 : 0.9));
+    return new THREE.Vector3(this.layout.laneX(lane), y, this.layout.zOf(p) + (p === this.me ? 0 : 0.9));
   }
 
   // ---- events --------------------------------------------------------------------------------
@@ -415,17 +424,17 @@ export class DuelScene {
         break;
       }
       case 'fizzle':
-        if (e.p === me) this.plane.fizzle();
+        if (e.p === me && !this.input.isDrawing) this.plane.fizzle();
         break;
       case 'misfire': {
         a.play('fizzle', { priority: 2 });
         a.play('fatigueCrack');
-        const tip = e.p === me ? this.player.tipWorld(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3());
+        const tip = e.p === me ? this.myTip(new THREE.Vector3()) : this.enemy.tip(new THREE.Vector3());
         vfx.burst({ pos: tip, color: 0xff5a3a, count: 50, speed: 3.5, life: 0.6, size: 0.14, gravity: 2 });
         vfx.ring(tip, 0xff5a3a, 0.1, 1.2, 0.4, 'z');
         world.shake(e.p === me ? 0.35 : 0.1);
         if (e.p === me) {
-          this.plane.fizzle();
+          if (!this.input.isDrawing) this.plane.fizzle();
           this.hud.callout('MISFIRE', '#ff8a6a');
           this.hud.note('Spamming the same sigil is unstable', 'warn');
         } else {
@@ -441,7 +450,7 @@ export class DuelScene {
           const now = performance.now();
           if (now - this.lastRejectAt > 250) {
             this.lastRejectAt = now;
-            this.plane.unravel();
+            if (!this.input.isDrawing) this.plane.unravel();
             a.play('fizzle');
             const msg: Record<string, string> = { cooldown: 'Not ready', aether: 'Not enough Aether', orbs: 'Need both orbs', held: 'Orb already held', noOrb: 'No orb held', blink: 'No room to Blink', busy: '', late: 'Too slow' };
             if (msg[e.reason]) this.hud.note(msg[e.reason]!, 'warn');
@@ -455,13 +464,14 @@ export class DuelScene {
         const big = e.spell === 'eclipse' ? 1 : 0.25;
         if (e.p === me) {
           this.player.pose.thrust(1);
+          this.avatar.pose.thrust(1);
           world.shake(big * 0.5 + 0.08);
           world.fovKick = e.spell === 'eclipse' ? 10 : 2.5;
         } else {
           this.enemy.pose.thrust(1);
           world.shake(big * 0.35);
         }
-        const tip = e.p === me ? this.player.tipWorld(this.tmp) : this.enemy.tip(this.tmp);
+        const tip = e.p === me ? this.myTip(this.tmp) : this.enemy.tip(this.tmp);
         vfx.burst({ pos: tip.clone(), color: info.color, count: e.spell === 'eclipse' ? 80 : 24, speed: 3, life: 0.5, size: 0.14 });
         if (e.spell === 'eclipse') {
           a.play('eclipseLaunch', { priority: 2 });
@@ -471,6 +481,10 @@ export class DuelScene {
           world.flash.intensity = 40;
         }
         if (e.spell === 'ward') a.play('ward');
+        if (e.spell === 'heal') {
+          a.play('heal');
+          vfx.burst({ pos: this.bodyPos(e.p, s.w[e.p].lane, 0.4), color: 0x7dffb0, count: 40, speed: 2, life: 1, size: 0.14, gravity: -2 });
+        }
         if (e.spell === 'mirror') a.play('mirrorOn');
         if (e.spell === 'gravewell') {
           a.play('gravInhale');
@@ -485,14 +499,15 @@ export class DuelScene {
         a.play('stormMark', { pan: pan(e.lane) });
         break;
       case 'stormStrike': {
-        this.fx.strikeBolt(e.lane, e.p === 0 ? 1 : 0);
-        world.flash.color.setHex(0xcff6ff);
+        this.fx.strikeBolt(e.lane, e.p === 0 ? 1 : 0, e.meteor ? 0xffa040 : undefined);
+        world.flash.color.setHex(e.meteor ? 0xffb060 : 0xcff6ff);
         world.flash.intensity = 60;
         world.flash.position.set(this.layout.laneX(e.lane), 6, this.layout.zOf(e.p === 0 ? 1 : 0));
-        a.play('impact_storm', { priority: 2 });
+        a.play(e.meteor ? 'impact_meteor' : 'impact_storm', { priority: 2 });
         world.shake(e.hit ? 0.45 : 0.18);
         const target: PlayerId = e.p === 0 ? 1 : 0;
-        vfx.burst({ pos: this.bodyPos(target, e.lane, 0.3), color: 0xaff6ff, count: 50, speed: 5, life: 0.5, size: 0.14, gravity: 3 });
+        if (e.meteor) vfx.ring(new THREE.Vector3(this.layout.laneX(e.lane), 0.1, this.layout.zOf(target)), 0xffa040, 0.4, 3.2, 0.6, 'y');
+        vfx.burst({ pos: this.bodyPos(target, e.lane, 0.3), color: e.meteor ? 0xffa040 : 0xaff6ff, count: 50, speed: 5, life: 0.5, size: 0.14, gravity: 3 });
         if (!e.hit && target === me) {
           this.hud.note('Dodged', 'good');
         }
@@ -578,7 +593,7 @@ export class DuelScene {
         world.shake(0.5);
         break;
       case 'blink': {
-        const pos = e.p === me ? new THREE.Vector3(this.layout.laneX(e.from), 1, WIZ_Z - 1) : this.bodyPos(e.p, e.from, 1.2);
+        const pos = this.bodyPos(e.p, e.from, 1.1);
         vfx.burst({ pos, color: 0xbfd8ff, count: 24, speed: 2, life: 0.4, size: 0.12 });
         a.play('blink', { pan: pan(e.from) });
         break;
@@ -589,11 +604,11 @@ export class DuelScene {
       case 'hit': {
         if (e.kind === 'burn') {
           if (e.p === me) a.play('hit');
-          vfx.burst({ pos: e.p === me ? this.tmp.set(0, 1.2, WIZ_Z - 1).clone() : this.bodyPos(e.p, e.lane, 1.6), color: 0xff7a2a, count: 4, speed: 1, life: 0.5, size: 0.1, gravity: -1 });
+          vfx.burst({ pos: this.bodyPos(e.p, e.lane, e.p === me ? 1.9 : 1.6), color: 0xff7a2a, count: 4, speed: 1, life: 0.5, size: 0.1, gravity: -1 });
           break;
         }
         const pos = this.bodyPos(e.p, e.lane, 1.6);
-        const kindColor: Record<string, number> = { cinder: 0xff7a2a, storm: 0xaff6ff, blast: 0xffcf4a, lance: 0xa36bff, shard: 0xbfe6ff, eclipse: 0xffb020, gravewell: 0x9b5cff, wellspring: 0x9fd8ff };
+        const kindColor: Record<string, number> = { dart: 0xaaf6ff, riptide: 0x3fd0c0, crescent: 0xf2e6a0, fang: 0xff5a6a, meteor: 0xffa040, cinder: 0xff7a2a, storm: 0xaff6ff, blast: 0xffcf4a, lance: 0xa36bff, shard: 0xbfe6ff, eclipse: 0xffb020, gravewell: 0x9b5cff, wellspring: 0x9fd8ff };
         const col = kindColor[e.kind] ?? 0xffffff;
         const big = Math.min(1, e.dmg / 40);
         vfx.burst({ pos, color: col, count: 30 + Math.round(big * 80), speed: 3 + big * 5, life: 0.7, size: 0.16, gravity: 2 });
@@ -607,6 +622,7 @@ export class DuelScene {
           a.play('damage');
           this.hud.hurt(e.dmg);
           this.player.pose.flinch(1);
+          this.avatar.pose.flinch(1);
         } else {
           this.enemy.pose.flinch(1);
         }
@@ -643,17 +659,24 @@ export class DuelScene {
         break;
       case 'stagger':
         a.play('stagger');
-        if (e.p === me) this.input.abort();
         break;
       case 'interrupt':
-        if (e.p === me) {
-          this.plane.unravel();
-          this.input.abort();
-        }
         break;
       case 'combo':
         if (e.name !== 'ECLIPSE' || true) this.hud.callout(e.name + '!', e.name === 'ECLIPSE' ? '#ffb020' : e.name === 'THUNDERBURN' ? '#8ff6ff' : '#cfe0ff');
         break;
+      case 'heal': {
+        const pos = this.bodyPos(e.p, s.w[e.p].lane, 1.4);
+        vfx.ring(pos, 0x7dffb0, 0.3, 1.6, 0.6, 'y');
+        this.hud.floatText('+' + Math.round(e.amount), pos.clone().add(new THREE.Vector3(0, 0.6, 0)), world.camera, '#7dffb0');
+        break;
+      }
+      case 'aegis': {
+        a.play('aegis');
+        vfx.ring(this.bodyPos(e.p, s.w[e.p].lane, 0.2), 0xffe08a, 0.4, 3, 0.7, 'y');
+        if (e.p === me) this.hud.note('Aegis: −40% damage', 'good');
+        break;
+      }
       case 'weave':
         a.play('weave');
         if (e.p === me) this.hud.note('Spellweave!', 'good');
@@ -750,15 +773,18 @@ export class DuelScene {
       world.camera.position.set(tgt.x + Math.cos(k.angle + 1) * 6.5, 2.8 + Math.sin(k.t) * 0.3, tgt.z + Math.sin(k.angle + 1) * 6.5);
       world.camera.lookAt(tgt.x, 1.4, tgt.z);
     } else {
-      world.placeCamera(x, WIZ_Z + 0.3, -6, dt);
+      const third = this.third;
+      if (third) world.placeThird(new THREE.Vector3(x * 0.92 + 1.25, 3.7, WIZ_Z + 5.0), new THREE.Vector3(x * 0.25 - 0.35, 1.45, -3.6));
+      else world.placeCamera(x, WIZ_Z + 0.3, -6, dt);
     }
+    this.player.group.visible = !this.third;
 
     // rigs
     const holdsF = { aurum: fw.orbs.aurum > s.tick, umbra: fw.orbs.umbra > s.tick };
     const holdsM = { aurum: mw.orbs.aurum > s.tick, umbra: mw.orbs.umbra > s.tick };
     this.enemy.update(cosmeticDt, fw, this.wizX(foe, fw, viewTick), this.layout.zOf(foe), s.tick, holdsF, this.tellsOn);
-    this.avatar.group.visible = !!this.killcam;
-    if (this.killcam) this.avatar.update(cosmeticDt, mw, x, this.layout.zOf(me), s.tick, holdsM, false);
+    this.avatar.group.visible = this.third || !!this.killcam;
+    if (this.avatar.group.visible) this.avatar.update(cosmeticDt, mw, x, this.layout.zOf(me), s.tick, holdsM, false);
     const drawingNow = this.input.isDrawing;
     let tipLocal: THREE.Vector3 | null = null;
     if (drawingNow && this.plane.strokeLength > 0) {
@@ -768,7 +794,7 @@ export class DuelScene {
     this.player.update(cosmeticDt, mw, tipLocal, holdsM, mw.aether, mw.vit, s.tick);
     this.plane.update(dt, drawingNow);
     this.fx.update(cosmeticDt, s, viewTick);
-    this.fx.charge(me, mw.windup, s.tick, this.player.tipWorld(this.tmp).clone(), cosmeticDt);
+    this.fx.charge(me, mw.windup, s.tick, this.myTip(this.tmp).clone(), cosmeticDt);
     this.fx.charge(foe, fw.windup, s.tick, this.enemy.tip(this.tmp).clone(), cosmeticDt);
 
     // looping audio: incoming projectiles rise in pitch as they approach (audio telegraph)
@@ -868,7 +894,7 @@ const idleWizard = ((): Wizard => {
   return {
     vit: 100, aether: 100, poise: 40, lane: 1, state: 'idle', stateUntil: 0, oath: null, windup: null, draw: null, cooldowns: {}, blinkReady: 0,
     blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0, lastHit: 0, brokenUntil: 0, openUntil: 0, orbs: { aurum: 0, umbra: 0 }, ward: null,
-    mirror: null, burnUntil: 0, burnPhase: 0, chillUntil: 0, lastSpell: null, lastCastTick: 0, fatigue: 0, recent: [], weaveUntil: 0, echoNext: false,
+    mirror: null, burnUntil: 0, burnPhase: 0, aegisUntil: 0, heal: null, chillUntil: 0, lastSpell: null, lastCastTick: 0, fatigue: 0, recent: [], weaveUntil: 0, echoNext: false,
     casts: 0, stats: { damageDealt: 0, casts: {} },
   };
 })();

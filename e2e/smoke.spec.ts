@@ -37,7 +37,7 @@ test('boots, opens the Practice Sanctum, then completes a duel round against the
   // duel vs Apprentice
   await page.evaluate(() => (window as any).__sigil.menu());
   await page.getByRole('button', { name: 'Duel the Magister' }).click();
-  await page.getByRole('heading', { name: 'Apprentice' }).click();
+  await page.getByRole('heading', { name: 'Gentle' }).click();
   await page.getByRole('heading', { name: 'Oath of Embers' }).click();
   await expect(page.locator('#hud')).toBeVisible();
   await page.waitForTimeout(500);

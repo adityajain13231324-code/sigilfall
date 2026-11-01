@@ -24,14 +24,17 @@ npm run sim:balance  # 1000 headless AI-vs-AI rounds: spell usage, win rates
 
 | Action | Desktop | Touch |
 |---|---|---|
-| Draw a sigil | hold the mouse inside the glass sigil plane, release to cast | drag |
+| Draw a sigil | hold the mouse inside the glass sigil plane and take your time (6 s window); your line stays visible until you let go | drag |
 | Feint (cancel) | release the pointer **outside** the plane | same |
 | Blink one lane | `A` / `D` or arrow keys | swipe from the screen edges, or the on-screen arrows |
 | Fire held orb | `Q` Aurum, `E` Umbra | tap the orb slots |
 | Quick-cast (accessibility, off by default) | `1`–`8`, +30% Aether, always Rough | — |
+| Sigil list | `Tab` or the Sigils button | Sigils button |
 | Pause | `Esc` | Pause button |
 
 ## The sigils
+
+The camera is third person by default (Settings → Camera for first person). Fifteen sigils:
 
 | Spell | Draw | Notes |
 |---|---|---|
@@ -42,6 +45,13 @@ npm run sim:balance  # 1000 headless AI-vs-AI rounds: spell usage, win rates
 | Gravewell | inward spiral | collapses projectiles and Eclipse, pops orbs, interrupts channels |
 | Aurum / Umbra Orb | circle: **clockwise** / **counter-clockwise** | hold one of each; `Q`/`E` fire Knockback Blast / Pull Lance |
 | Eclipse Rend | ∞ with both orbs held | 2.5 s channel, 55 damage + Poise break |
+| Piercing Dart | V | very fast, cheap, ignores Ward |
+| Riptide Lash | ∿ wave | water bolt that Chills (slows casting) |
+| Mending Light | ♥ heart | heals 24 over 2 s, douses Burn |
+| Aegis | ▢ square | −40% damage for 4 s |
+| Moonblade | C | wide blade: hits your lane and its neighbours |
+| Starfall | ★ star | meteors mark all three lanes, landing one after another |
+| Twin Fangs | M | two fangs, two lanes, two speeds |
 
 Combos: **Thunderburn**, **Prism Return**, **Wellspring**. Full table, counters and rationale: [docs/DESIGN.md](docs/DESIGN.md).
 

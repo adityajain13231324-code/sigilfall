@@ -107,6 +107,8 @@ export class SigilPlane {
   private ghostPts: Pt[] = [];
   private ghostProgress = 0;
   private ghostActive = false;
+  private canonPts: { x: number; y: number; w: number }[] = [];
+  private canonT = 0;
   // metrics (screen px)
   cx = 0;
   cy = 0;
@@ -223,14 +225,19 @@ export class SigilPlane {
   }
 
   /** recognised: snap to the clean canonical symbol with a flash */
-  snap(canon: Pt[], holdFor = 0.5): void {
+  snap(canon: Pt[], holdFor = 1.0): void {
     this.phase = 'snap';
     this.phaseT = 0;
     this.holdFor = holdFor;
-    this.pts = canon.map((p, i) => {
+    // your own stroke stays on screen; the clean symbol blooms over it on the ghost ribbon
+    this.ghostActive = false;
+    this.canonPts = canon.map((p) => {
       const l = this.local(p);
-      return { x: l.x, y: l.y, t: i, w: 0.034 };
+      return { x: l.x, y: l.y, w: 0.026 };
     });
+    this.ghost.set(this.canonPts);
+    this.ghost.mat.uniforms.uColor!.value.copy(this.color);
+    this.canonT = 1;
     this.live.mat.uniforms.uFlash!.value = 1;
     this.timer.visible = false;
     this.glow = 1.4;
@@ -301,6 +308,10 @@ export class SigilPlane {
       this.ghost.set(shown);
       this.ghost.mat.uniforms.uFade!.value = this.ghostProgress > 1 ? Math.max(0, 1 - (this.ghostProgress - 1) * 4) * 0.8 : 0.8;
       this.ghost.mat.uniforms.uColor!.value.set(0xffe6a8);
+    } else if (this.canonT > 0) {
+      this.canonT = Math.max(0, this.canonT - dt / 1.0);
+      this.ghost.mat.uniforms.uFade!.value = Math.min(1, this.canonT * 1.6);
+      if (this.canonT === 0) this.ghost.set([]);
     } else {
       this.ghost.mat.uniforms.uFade!.value = 0;
     }
@@ -313,7 +324,7 @@ export class SigilPlane {
         const u = this.live.mat.uniforms;
         if (this.phase === 'snap') {
           u.uFlash!.value = Math.max(0, 1 - f * 2);
-          u.uFade!.value = f < 0.7 ? 1 : Math.max(0, 1 - (f - 0.7) / 0.3);
+          u.uFade!.value = f < 0.55 ? 1 : Math.max(0, 1 - (f - 0.55) / 0.45);
         } else if (this.phase === 'fizzle') {
           u.uDissolve!.value = Math.min(0.98, f);
           u.uFade!.value = 0.7;

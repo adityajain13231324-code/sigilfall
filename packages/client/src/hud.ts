@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { DuelState, PlayerId, Projectile, StormStrike } from '@sigilfall/sim';
 import { B } from '@sigilfall/sim';
-import { SPELL_INFO, TIER_COLOR, TIER_NAMES } from './theme';
+import { canonical } from '@sigilfall/recognizer';
+import { SPELL_INFO, SPELL_ORDER, TIER_COLOR, TIER_NAMES } from './theme';
 import { settings } from './settings';
 
 const ARC = 2 * Math.PI * 44;
@@ -14,6 +15,22 @@ function bracer(cls: string, label: string, color: string): string {
     <svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="44"/><circle class="arc" cx="50" cy="50" r="44" stroke="${color}" stroke-dasharray="${ARC}" stroke-dashoffset="0"/></svg>
     <div class="val"><b>100</b><i>${label}</i></div><div class="cracks"></div>
   </div>`;
+}
+
+/** Mini SVG of a sigil with a dot at its start, for the in-duel cheat sheet. */
+export function sigilSvg(sp: keyof typeof SPELL_INFO, size = 44): string {
+  const info = SPELL_INFO[sp];
+  const pts = canonical(info.shape, sp === 'umbra' ? 'ccw' : 'cw');
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${(6 + p.x * 32).toFixed(1)} ${(6 + p.y * 32).toFixed(1)}`).join(' ');
+  const s0 = pts[0]!;
+  return `<svg viewBox="0 0 44 44" width="${size}" height="${size}"><path d="${d}" fill="none" stroke="${info.css}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${(6 + s0.x * 32).toFixed(1)}" cy="${(6 + s0.y * 32).toFixed(1)}" r="3" fill="#fff"/></svg>`;
+}
+
+export function sigilSheetHtml(): string {
+  return `<div class="sheet"><h2>Sigils</h2><div class="sheetgrid">${SPELL_ORDER.map((sp) => {
+    const i = SPELL_INFO[sp];
+    return `<div class="sig">${sigilSvg(sp)}<div><b style="color:${i.css}">${i.name}</b><small>${i.blurb.split('. ')[0]}.</small></div></div>`;
+  }).join('')}</div><p class="sheethint">Hold to draw, release to cast. The white dot is a good place to start.</p></div>`;
 }
 
 export class Hud {

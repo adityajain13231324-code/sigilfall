@@ -21,8 +21,8 @@ export class Layout {
   }
 }
 
-const COL: Record<ProjKind, number> = { cinder: 0xff7a2a, blast: 0xffcf4a, lance: 0x9b5cff, shard: 0xbfe6ff, eclipse: 0xffb020 };
-const SHAPE_ICON: Record<ProjKind, string> = { cinder: 'flame', blast: 'circle', lance: 'spiral', shard: 'hex', eclipse: 'infinity' };
+const COL: Record<ProjKind, number> = { cinder: 0xff7a2a, blast: 0xffcf4a, lance: 0x9b5cff, shard: 0xbfe6ff, eclipse: 0xffb020, dart: 0xaaf6ff, riptide: 0x3fd0c0, crescent: 0xf2e6a0, fang: 0xff5a6a };
+const SHAPE_ICON: Record<ProjKind, string> = { cinder: 'flame', blast: 'circle', lance: 'spiral', shard: 'hex', eclipse: 'infinity', dart: 'vee', riptide: 'wave', crescent: 'moon', fang: 'em' };
 void SHAPE_ICON;
 
 const WELL_F = /* glsl */ `
@@ -85,6 +85,10 @@ export class SpellFx {
     }
     for (const w of this.wells.values()) this.group.remove(w.m);
     this.wells.clear();
+    for (const p of [0, 1]) {
+      if (this.aegis[p]) this.group.remove(this.aegis[p]!);
+      this.aegis[p] = null;
+    }
     for (const b of this.bolts) b.line.forEach((l) => this.group.remove(l));
     this.bolts.length = 0;
   }
@@ -111,6 +115,25 @@ export class SpellFx {
     } else if (pr.kind === 'lance') {
       core = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.1, 10), new THREE.MeshBasicMaterial({ color: 0xe6d4ff }));
       core.rotation.x = Math.PI / 2 * (this.layout.fwd(pr.owner) > 0 ? 1 : -1);
+    } else if (pr.kind === 'dart') {
+      r = 0.12;
+      core = new THREE.Mesh(new THREE.ConeGeometry(0.1, 1.2, 8), new THREE.MeshBasicMaterial({ color: 0xf2ffff }));
+      core.rotation.x = Math.PI / 2 * (this.layout.fwd(pr.owner) > 0 ? 1 : -1);
+    } else if (pr.kind === 'fang') {
+      r = 0.2;
+      core = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.9, 6), new THREE.MeshBasicMaterial({ color: 0xffd0d6 }));
+      core.rotation.x = Math.PI / 2 * (this.layout.fwd(pr.owner) > 0 ? 1 : -1);
+    } else if (pr.kind === 'riptide') {
+      r = 0.28;
+      core = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), new THREE.MeshBasicMaterial({ color: 0xcffff6 }));
+      const swirl = new THREE.Mesh(new THREE.TorusGeometry(r * 1.9, 0.04, 6, 32), new THREE.MeshBasicMaterial({ color: 0x3fd0c0, blending: THREE.AdditiveBlending, transparent: true }));
+      parts.push(swirl);
+      g.add(swirl);
+    } else if (pr.kind === 'crescent') {
+      r = 0.9;
+      core = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.13, 8, 28, Math.PI), new THREE.MeshBasicMaterial({ color: 0xfffbe0 }));
+      core.rotation.z = Math.PI / 2 * (this.layout.fwd(pr.owner) > 0 ? -1 : 1);
+      core.rotation.y = Math.PI / 2;
     } else if (pr.kind === 'eclipse') {
       r = 0.95;
       core = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20), new THREE.MeshBasicMaterial({ color: 0x030106 }));
@@ -126,7 +149,7 @@ export class SpellFx {
     out.scale.copy(core.scale).multiplyScalar(1.28);
     out.rotation.copy(core.rotation);
     g.add(out, core);
-    if (pr.kind !== 'eclipse') g.add(makeGlow(c, r * 5.5, 0.75));
+    if (pr.kind !== 'eclipse') g.add(makeGlow(c, Math.max(0.5, r) * 5.5, 0.75));
     let light: THREE.PointLight | undefined;
     if (pr.kind === 'cinder' || pr.kind === 'eclipse') {
       light = new THREE.PointLight(c, pr.kind === 'eclipse' ? 3 : 2.2, 9, 1.8);
@@ -170,7 +193,8 @@ export class SpellFx {
         const col = pr.reflected ? 0xdfe8f5 : COL[pr.kind];
         if (pr.kind === 'cinder') this.vfx.burst({ pos, color: col, count: 3, speed: 0.6, life: 0.45, size: 0.14, gravity: -0.6, dir: new THREE.Vector3(0, 0, -lay.fwd(pr.owner)), spread: 0.8 });
         else if (pr.kind === 'eclipse') this.vfx.burst({ pos, color: Math.random() < 0.5 ? 0xffb020 : 0xa36bff, count: 5, speed: 1.4, life: 0.8, size: 0.18, inward: true, radius: 1.8 });
-        else if (pr.kind === 'lance') this.vfx.burst({ pos, color: col, count: 2, speed: 0.5, life: 0.4, size: 0.1 });
+        else if (pr.kind === 'lance' || pr.kind === 'dart' || pr.kind === 'crescent') this.vfx.burst({ pos, color: col, count: 2, speed: 0.5, life: 0.4, size: 0.1 });
+        else if (pr.kind === 'riptide') this.vfx.burst({ pos, color: col, count: 3, speed: 0.9, life: 0.5, size: 0.1, gravity: 1.5 });
         else this.vfx.burst({ pos, color: col, count: 1, speed: 0.4, life: 0.4, size: 0.1 });
       }
       if (pr.kind === 'eclipse') {
@@ -180,6 +204,7 @@ export class SpellFx {
       } else {
         v.group.scale.setScalar(grow);
         if (pr.kind === 'shard') v.group.rotation.y += dt * 6;
+        if (pr.kind === 'riptide') v.parts.forEach((p, i) => { p.rotation.x += dt * 5; p.rotation.y += dt * 3 + i; });
       }
       if (v.light) v.light.intensity = (pr.kind === 'eclipse' ? 3 : 2.2) * (0.8 + Math.sin(this.t * 40) * 0.2);
       // countdown ring at the landing spot
@@ -257,6 +282,10 @@ export class SpellFx {
       this.syncWard(p, w.ward, dt);
       this.syncMirror(p, w.mirror !== null, w.lane, dt);
       this.syncEclipse(p, w.state === 'channeling', dt);
+      this.syncAegis(p, s.tick < w.aegisUntil, w.lane, dt);
+      if (w.heal && !settings.clarity && Math.random() < dt * 40) {
+        this.vfx.burst({ pos: new THREE.Vector3(this.layout.laneX(w.lane) + (Math.random() - 0.5) * 1.2, 0.2, this.layout.zOf(p) + (Math.random() - 0.5) * 1.2), color: 0x7dffb0, count: 1, speed: 1.2, life: 1.1, size: 0.12, gravity: -2.2, drag: 0.4 });
+      }
     }
     const seenW = new Set<number>();
     for (const wl of s.wells) {
@@ -309,19 +338,18 @@ export class SpellFx {
   }
 
   private makeStrike(st: StormStrike) {
-    const line = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xaff6ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const line = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: st.meteor ? 0xffa040 : 0xaff6ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
     line.frustumCulled = false;
-    const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0x8ff6ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: st.meteor ? 0xffa040 : 0x8ff6ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     const mark = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.28, 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     mark.rotation.x = -Math.PI / 2;
     this.group.add(line, ring, mark);
-    void st;
     return { line, ring, mark };
   }
 
   /** lightning bolt from the sky onto lane/target */
-  strikeBolt(lane: Lane, target: PlayerId): void {
+  strikeBolt(lane: Lane, target: PlayerId, color = 0xe8ffff): void {
     const x = this.layout.laneX(lane);
     const z = this.layout.zOf(target);
     const lines: THREE.Line[] = [];
@@ -336,7 +364,7 @@ export class SpellFx {
         pts.push(new THREE.Vector3(i === n ? x : cx, y0 - (y0 / n) * i, i === n ? z : cz));
         if (depth < 2 && Math.random() < 0.28) mk(cx, y0 - (y0 / n) * i, cz, depth + 1);
       }
-      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xe8ffff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
       this.group.add(l);
       lines.push(l);
     };
@@ -433,6 +461,29 @@ export class SpellFx {
 
   mirrorCenter(p: PlayerId, lane: number): THREE.Vector3 {
     return new THREE.Vector3(this.layout.laneX(lane), 1.7, this.layout.zOf(p) + this.layout.fwd(p) * 1.7);
+  }
+
+  private aegis: Record<number, THREE.Mesh | null> = { 0: null, 1: null };
+
+  private syncAegis(p: PlayerId, on: boolean, lane: number, dt: number): void {
+    let m = this.aegis[p];
+    if (!on) {
+      if (m) {
+        this.group.remove(m);
+        this.aegis[p] = null;
+      }
+      return;
+    }
+    if (!m) {
+      m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.7, 1), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, wireframe: false, side: THREE.DoubleSide }));
+      const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.72, 1), new THREE.MeshBasicMaterial({ color: 0xfff2c0, wireframe: true, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.add(wire);
+      this.group.add(m);
+      this.aegis[p] = m;
+    }
+    m.position.set(this.layout.laneX(lane), 1.7, this.layout.zOf(p));
+    m.rotation.y += dt * 0.6;
+    m.scale.setScalar(1 + Math.sin(this.t * 4) * 0.02);
   }
 
   private syncWell(wl: Well, s: DuelState, dt: number): void {

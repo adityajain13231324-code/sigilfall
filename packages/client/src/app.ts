@@ -6,6 +6,7 @@ import { Driver, LocalDriver } from './driver';
 import { settings, saveSettings, Difficulty, store } from './settings';
 import { OATH_INFO } from './theme';
 import { Practice } from './practice';
+import { sigilSheetHtml } from './hud';
 import { Online } from './net';
 
 export interface AppApi {
@@ -118,8 +119,8 @@ export class App implements AppApi {
   private chooseDifficulty(): void {
     const el = this.show(`<div class="menu"><div class="panel"><h2>Choose your opponent</h2>
       <div class="cards">
-        ${(['apprentice', 'adept', 'archmage'] as Difficulty[]).map((d) => `<button class="card ${d === this.difficulty ? 'sel' : ''}" data-d="${d}"><span class="g">${d === 'apprentice' ? '✦' : d === 'adept' ? '✶' : '☽'}</span><h3>${d[0]!.toUpperCase() + d.slice(1)}</h3>
-          <p>${d === 'apprentice' ? 'Slow, predictable, never feints.' : d === 'adept' ? 'Reads you and punishes repeated spells.' : 'Fast reads, feints, baits Mirrorveil.'}</p></button>`).join('')}
+        ${(['apprentice', 'adept', 'archmage'] as Difficulty[]).map((d) => `<button class="card ${d === this.difficulty ? 'sel' : ''}" data-d="${d}"><span class="g">${d === 'apprentice' ? '✦' : d === 'adept' ? '✶' : '☽'}</span><h3>${d === 'apprentice' ? 'Gentle' : d === 'adept' ? 'Adept' : 'Archmage'}</h3>
+          <p>${d === 'apprentice' ? 'Slow and forgiving. Learn the sigils at your own pace.' : d === 'adept' ? 'Reads you and punishes repeated spells.' : 'Fast reads, feints, baits Mirrorveil. Brutal.'}</p></button>`).join('')}
       </div><p style="text-align:center;margin-top:14px">Best of 3 &middot; Magister Corvane Vael, the Hollow Magister</p>
       <div class="row"><button class="btn small" data-a="back">Back</button></div></div></div>`);
     el.querySelectorAll('[data-d]').forEach((b) =>
@@ -154,12 +155,11 @@ export class App implements AppApi {
     this.scene.setIdleVisible(true);
     const tb = document.createElement('div');
     tb.className = 'toolbar';
-    tb.innerHTML = `<button class="btn small" id="pausebtn">Pause</button>`;
+    this.fillToolbar(tb);
     this.screen.appendChild(tb);
-    tb.querySelector('button')!.addEventListener('click', () => this.pause());
     this.audio.play('roundStart');
     this.scene.hud.callout('FIGHT', '#cfe0ff');
-    this.scene.hud.note('Hold to draw ▲ Cinder Bolt  ·  A / D to Blink', 'hint');
+    this.scene.hud.note('Hold and draw ▲ to cast  ·  A / D to Blink  ·  Tab for the sigil list', 'hint');
   }
 
   pause(): void {
@@ -190,9 +190,24 @@ export class App implements AppApi {
     this.clear();
     const tb = document.createElement('div');
     tb.className = 'toolbar';
-    tb.innerHTML = `<button class="btn small">Pause</button>`;
+    this.fillToolbar(tb);
     this.screen.appendChild(tb);
-    tb.querySelector('button')!.addEventListener('click', () => this.pause());
+  }
+
+  private fillToolbar(tb: HTMLElement): void {
+    tb.innerHTML = `<button class="btn small" data-t="pause">Pause</button><button class="btn small" data-t="sigils">Sigils</button>`;
+    tb.querySelector('[data-t=pause]')!.addEventListener('click', () => this.pause());
+    tb.querySelector('[data-t=sigils]')!.addEventListener('click', () => {
+      const open = this.screen.querySelector('.sheet');
+      if (open) return open.remove();
+      this.screen.insertAdjacentHTML('beforeend', sigilSheetHtml());
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && this.inDuel) {
+        e.preventDefault();
+        tb.querySelector<HTMLElement>('[data-t=sigils]')!.click();
+      }
+    }, { once: true });
   }
 
   quit(): void {
@@ -252,6 +267,7 @@ export class App implements AppApi {
       ${check('clarity', 'Clarity mode', 'Less bloom, shake and particles; stronger outlines')}
       ${check('reducedMotion', 'Reduced motion', 'Calms camera shake, slow-motion and flashes')}
       ${check('colorBlind', 'Colour-blind shapes', 'Adds shape icons to spells and telegraphs')}
+      <div class="setting"><span>Camera</span><select data-k="view"><option value="third" ${settings.view === 'third' ? 'selected' : ''}>Third person</option><option value="first" ${settings.view === 'first' ? 'selected' : ''}>First person</option></select></div>
       <div class="setting"><span>UI scale</span><input type="range" min="0.8" max="1.5" step="0.05" value="${settings.uiScale}" data-k="uiScale"></div>
       <div class="setting"><span>Sigil plane size</span><input type="range" min="0.8" max="1.5" step="0.05" value="${settings.planeScale}" data-k="planeScale"></div>
       ${check('clickToDraw', 'Click to start / click to finish', 'Instead of hold-to-draw')}
@@ -259,6 +275,12 @@ export class App implements AppApi {
       ${check('quickCast', 'Quick-cast keys 1–8', 'Casts without drawing: +30% Aether, always Rough. Disabled online unless enabled by both')}
       <div class="setting"><span>Recognizer strictness</span><input type="range" min="0.85" max="1.15" step="0.01" value="${settings.strictness}" data-k="strictness"></div>
       <div class="row" style="margin-top:14px"><button class="btn" data-a="back">Back</button></div></div></div>`);
+    el.querySelectorAll('select').forEach((sel) =>
+      sel.addEventListener('change', () => {
+        (settings as unknown as Record<string, unknown>)[sel.dataset.k!] = sel.value;
+        saveSettings();
+      }),
+    );
     el.querySelectorAll('input').forEach((inp) =>
       inp.addEventListener('input', () => {
         const k = inp.dataset.k as keyof typeof settings;
