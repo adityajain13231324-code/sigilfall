@@ -336,7 +336,8 @@ export class WizardAI implements Bot {
     const wardUp = !!fw.ward;
     const burning = s.tick < fw.burnUntil;
 
-    add('cinder', 0.8 - fatigue('cinder') - (wardUp ? 0.7 : 0) + (burning ? -0.2 : 0.1));
+    const chilled = s.tick < fw.chillUntil;
+    add('cinder', (chilled ? 0.9 : 0) + 0.8 - fatigue('cinder') - (wardUp ? 0.7 : 0) + (burning ? -0.2 : 0.1));
     add('storm', 0.55 + (wardUp ? 1.1 : 0) + (burning ? 0.9 : 0) + (fw.state === 'windup' || fw.state === 'channeling' ? 0.8 : 0) - fatigue('storm'));
     if (!w.ward) add('ward', (lowAether ? 0.8 : 0.15) + (rep === 'cinder' ? this.p.adapt * 0.7 : 0) + (w.vit < 40 ? 0.4 : 0));
     add('gravewell', 0.05 + (hasBothOrbs(s, foe) ? 0.8 : 0));
@@ -349,7 +350,7 @@ export class WizardAI implements Bot {
     if (this.phase >= 2) add('starfall', 0.35 * (this.phase - 1));
     if (this.phase >= 3) add('crescent', 0.3);
     add('dart', 0.4 + (wardUp ? 0.9 : 0));
-    add('riptide', 0.3 + (fw.state === 'idle' ? 0.1 : 0));
+    add('riptide', 0.3 + (fw.state === 'idle' ? 0.1 : 0) + (!chilled && !cooldownLeft(s, me, 'cinder') ? 0.35 : 0));
     add('crescent', 0.4);
     add('fangs', 0.35);
     add('starfall', 0.3 + (fw.lane !== 1 ? 0.1 : 0));

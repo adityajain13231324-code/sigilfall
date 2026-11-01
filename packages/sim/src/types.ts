@@ -91,6 +91,9 @@ export interface Wizard {
   cooldowns: Partial<Record<SpellId, number>>;
   blinkReady: number;
   blinkFrom: Lane;
+  blinkStart: number;
+  /** Perfect Dodge rewards come at most this often */
+  perfectReady: number;
   blinkTo: Lane;
   invulnUntil: number;
   regenFrom: number;

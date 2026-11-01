@@ -68,10 +68,10 @@ The server ignores any spell or tier a client claims: it recognises the stroke i
 
 | Mechanic | Rule |
 |---|---|
-| Hollow Rift | first at 14 s, then every ~20 s: a random lane is marked for 1.4 s, then deals 5 dmg/s for 5 s to anyone standing in it (Aegis reduces it; a Blink in progress is safe) |
+| Hollow Rift | first at 14 s, then every ~20 s: a random lane is marked for 1.4 s, then deals 4 dmg/s for 5 s to anyone standing in it (Aegis reduces it; a Blink in progress is safe) |
 | Aether crystal | first at 7 s, then every ~12 s: appears in a lane (never the Rift's) for 8 s; the first wizard to stand in the lane gets +25 Aether and +6 Vitality |
-| Perfect Dodge | a Blink in progress when an attack aimed at the lane you left arrives: refunds the Blink cost, +14 Aether, Blink cooldown reset, Focus for 3 s (windups ×0.7) |
-| Perfect Parry | the Mirrorveil catches a projectile within its first 7 ticks: reflection ×1.4, +10 Aether |
+| Perfect Dodge | an attack aimed at the lane you left arrives within 9 ticks (0.3 s) of starting your Blink: refunds the Blink cost, +14 Aether, Focus for 3 s (windups ×0.7). The reward can trigger at most every 4 s, so Blink-spamming is not a strategy |
+| Perfect Parry | the Mirrorveil catches a projectile within its first 10 ticks (0.33 s): reflection ×1.4, +10 Aether |
 | Overcharge | 3 consecutive Perfect-tier draws (any non-Perfect cast resets): the next drawn spell ×1.35 |
 | Counter Hit | damage to a wizard in Windup or Channeling ×1.2 |
 | Shatter | Cinder on a Chilled target ×1.3, consumes the Chill |
@@ -95,3 +95,8 @@ The draw window is 6 s (`drawWindow`), the recogniser accepts strokes up to 7 s,
 - Spectators, ranked ladder, stretch spells (Emberwisp, Tide Surge, Hex of Echoes) and the other three opponents are design-only.
 - Online snapshots are rendered with a short blend, not a full 100 ms interpolation buffer.
 - Performance targets were not benchmarked on phones or an iGPU-only laptop in this build.
+
+
+## Mechanic tuning notes
+
+`packages/sim/scripts/mech-stats.ts` counts how often each mechanic fires per round in AI-vs-AI play, and `packages/recognizer/scripts/tiers.ts` measures how often hand-drawn strokes score Perfect (about 60-68% for a careful hand, 39% for a shaky one, so a three-Perfect Overcharge is reachable but must be earned). Changes from the first playtest data: Perfect Dodge fired 12.7 times a round for the strongest AI because rewards chained with a Blink cooldown reset, so the reset was removed and rewards got a 4 s cooldown (now about 7); the dodge window was widened from 6 to 9 ticks and the parry window from 7 to 10 so a human can hit them; the Rift was trimmed to 4 dmg/s; the AI now actually plays the Riptide then Cinder Shatter combo (0.03 to roughly 0.3-1 per round).

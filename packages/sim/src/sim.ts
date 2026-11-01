@@ -19,7 +19,7 @@ export const SPELLS: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewel
 function newWizard(): Wizard {
   return {
     vit: bal.vitality, aether: bal.aether, poise: bal.poise, lane: 1, state: 'idle', stateUntil: 0, oath: null,
-    windup: null, draw: null, cooldowns: {}, blinkReady: 0, blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0,
+    windup: null, draw: null, cooldowns: {}, blinkReady: 0, blinkStart: -999, perfectReady: 0, blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0,
     lastHit: -9999, brokenUntil: 0, openUntil: 0, aegisUntil: 0, focusUntil: 0, streak: 0, overcharge: false, heal: null, orbs: { aurum: 0, umbra: 0 }, ward: null, mirror: null, burnUntil: 0,
     burnPhase: 0, chillUntil: 0, lastSpell: null, lastCastTick: -9999, fatigue: 0, recent: [], weaveUntil: 0,
     echoNext: false, casts: 0, stats: { damageDealt: 0, casts: {} },
@@ -153,6 +153,7 @@ function doBlink(ctx: Ctx, p: PlayerId, dir: -1 | 1): void {
   w.aether -= bal.blink.aether;
   w.draw = null;
   w.blinkFrom = w.lane;
+  w.blinkStart = s.tick;
   w.blinkTo = to as Lane;
   w.invulnUntil = s.tick + bal.blink.invulnTicks;
   w.blinkReady = s.tick + T(bal.blink.cooldown);
@@ -550,11 +551,17 @@ function damage(ctx: Ctx, target: PlayerId, amount: number, poiseDmg: number, ki
 
 // ---- storms, wells, projectiles ----------------------------------------------------------------
 
+/** true if this wizard started a Blink out of `lane` within the Perfect Dodge window (a deliberately late dodge) */
+function justBlinked(s: DuelState, w: Wizard, lane: Lane): boolean {
+  return w.blinkFrom === lane && w.lane !== lane || w.state === 'blinking' ? w.blinkFrom === lane && s.tick - w.blinkStart <= bal.mechanics.perfectDodgeTicks : false;
+}
+
 function perfectDodge(ctx: Ctx, p: PlayerId): void {
   const { s, ev } = ctx;
   const w = s.w[p];
+  if (s.tick < w.perfectReady) return; // still a clean dodge, but no reward chain
+  w.perfectReady = s.tick + T(bal.mechanics.perfectDodgeCooldown);
   w.aether = Math.min(bal.aether, w.aether + bal.blink.aether + bal.mechanics.perfectDodgeAether);
-  w.blinkReady = s.tick; // the dodge costs nothing: you may go again immediately
   w.focusUntil = s.tick + T(bal.mechanics.focusSeconds);
   ev.push({ type: 'perfectDodge', p });
 }
@@ -572,7 +579,7 @@ function tickStrikes(ctx: Ctx): void {
     const c = bal.spells.storm;
     const stands = ew.lane === st.lane && s.tick >= ew.invulnUntil && ew.state !== 'dead';
     ev.push({ type: 'stormStrike', p: st.owner, lane: st.lane, hit: stands, meteor: st.meteor });
-    if (!stands && ew.state === 'blinking' && ew.blinkFrom === st.lane) perfectDodge(ctx, foe);
+    if (!stands && justBlinked(s, ew, st.lane)) perfectDodge(ctx, foe);
     if (!stands) continue;
     if (st.meteor) {
       if (ew.ward) {
@@ -690,11 +697,12 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
   }
   if (Math.abs(def.lane - pr.lane) > (pr.wide ? 1 : 0)) {
     ev.push({ type: 'dodge', p: defId, id: pr.id });
+    if (!pr.wide && justBlinked(s, def, pr.lane)) perfectDodge(ctx, defId);
     return;
   }
   if (s.tick < def.invulnUntil) {
     ev.push({ type: 'dodge', p: defId, id: pr.id });
-    if (def.state === 'blinking' && def.blinkFrom === pr.lane) perfectDodge(ctx, defId);
+    if (justBlinked(s, def, pr.lane)) perfectDodge(ctx, defId);
     return;
   }
   if (def.mirror && !pr.noReflect && pr.kind !== 'eclipse') {

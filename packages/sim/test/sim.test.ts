@@ -627,7 +627,6 @@ describe('skill mechanics', () => {
     r.until(() => r.has('perfectDodge'), 20);
     expect(r.s.w[1].aether).toBeGreaterThan(50 + 12); // blink cost refunded plus a bonus
     expect(r.s.w[1].focusUntil).toBeGreaterThan(r.s.tick);
-    expect(r.s.w[1].blinkReady).toBeLessThanOrEqual(r.s.tick);
     // focus shortens the next windup
     r.s.w[1].state = 'idle';
     r.send(1, { t: 'drawStart' });
