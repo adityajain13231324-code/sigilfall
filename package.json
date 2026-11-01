@@ -1,0 +1,29 @@
+{
+  "name": "sigilfall",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SIGILFALL - a browser wizard-duel game of drawn spells",
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w @sigilfall/client",
+    "dev:server": "npm run dev -w @sigilfall/server",
+    "dev:all": "concurrently -n client,server -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
+    "build": "npm run build -w @sigilfall/client",
+    "typecheck": "tsc -p packages/recognizer && tsc -p packages/sim && tsc -p packages/server && tsc -p packages/client",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "gen:templates": "tsx packages/recognizer/scripts/gen-templates.ts",
+    "sim:balance": "tsx packages/sim/scripts/balance-report.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "concurrently": "10.0.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "@types/node": "^24.0.0"
+  },
+  "engines": { "node": ">=20" }
+}
