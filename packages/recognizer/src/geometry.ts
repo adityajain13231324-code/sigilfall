@@ -115,8 +115,8 @@ export function selfCrossings(pts: Pt[]): number {
   return n;
 }
 
-/** Number of sharp corners (turning peaks above `minDeg`) along a resampled path. */
-export function cornerCount(pts: Pt[], closed: boolean, minDeg = 65): number {
+/** Sharp corners (turning peaks above `minDeg`) along a resampled path, as points. */
+export function cornerPoints(pts: Pt[], closed: boolean, minDeg = 65): Pt[] {
   const n = pts.length;
   const k = Math.max(2, Math.round(n / 10));
   const turn: number[] = [];
@@ -131,7 +131,7 @@ export function cornerCount(pts: Pt[], closed: boolean, minDeg = 65): number {
     while (d < -Math.PI) d += 2 * Math.PI;
     turn.push(Math.abs(d) * (180 / Math.PI));
   }
-  let count = 0;
+  const out: Pt[] = [];
   const w = Math.max(2, k);
   for (let i = 0; i < n; i++) {
     if (!closed && (i < w || i >= n - w)) continue;
@@ -147,9 +147,48 @@ export function cornerCount(pts: Pt[], closed: boolean, minDeg = 65): number {
         break;
       }
     }
-    if (peak) count++;
+    if (peak) out.push(pts[i]!);
   }
-  return count;
+  return out;
+}
+
+export const cornerCount = (pts: Pt[], closed: boolean, minDeg = 65): number => cornerPoints(pts, closed, minDeg).length;
+
+function hullArea(pts: Pt[]): number {
+  const p = pts.map((q) => ({ x: q.x, y: q.y })).sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Pt[] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: Pt[] = [];
+  for (const q of p.reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  lower.pop();
+  upper.pop();
+  return Math.abs(signedArea(lower.concat(upper)));
+}
+
+/** area of the drawn outline / area of its convex hull: ~1 for circles and polygons, lower with a notch (heart) */
+export function solidity(pts: Pt[]): number {
+  const h = hullArea(pts);
+  return h > 1e-9 ? Math.min(1, Math.abs(signedArea(pts)) / h) : 1;
+}
+
+/** how much the corner points hug the bounding-box corners (square, ~0) rather than its edge midpoints (diamond, large) */
+export function squareness(corners: Pt[], all: Pt[]): number {
+  const b = bounds(all);
+  const s = Math.max(b.w, b.h) || 1;
+  const cs = corners.map((c) => ({ x: (c.x - b.minX) / s, y: (c.y - b.minY) / s }));
+  const w = b.w / s;
+  const h = b.h / s;
+  const boxCorners = [[0, 0], [w, 0], [w, h], [0, h]];
+  const mids = [[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]];
+  const d = (set: number[][]) => cs.reduce((a, c) => a + Math.min(...set.map(([x, y]) => Math.hypot(c.x - x!, c.y - y!))), 0) / (cs.length || 1);
+  return d(mids) - d(boxCorners); // > 0 means square-like
 }
 
 export interface Features {
@@ -163,6 +202,10 @@ export interface Features {
   corners: number;
   areaSign: number; // +1 clockwise (y-down), from shoelace area
   size: number; // longest bbox side
+  solidity: number;
+  cornerPts: Pt[];
+  aspect: number; // bbox width / height
+  radialVar: number; // spread of distance from the centroid (circles ~0)
 }
 
 export function features(raw: Pt[]): Features {
@@ -203,5 +246,9 @@ export function features(raw: Pt[]): Features {
     corners: cornerCount(coarse, closure < 0.3),
     areaSign: signedArea(pts) >= 0 ? 1 : -1,
     size: Math.max(b.w, b.h),
+    solidity: solidity(pts),
+    aspect: b.h > 1e-6 ? b.w / b.h : 99,
+    radialVar: (() => { const bw = b.w || 1; const bh = b.h || 1; const nb = pts.map((p) => ({ x: (p.x - b.minX) / bw, y: (p.y - b.minY) / bh })); const m = centroid(nb); const rs = nb.map((p) => Math.hypot(p.x - m.x, p.y - m.y)); const mu = rs.reduce((a, v) => a + v, 0) / rs.length; return Math.sqrt(rs.reduce((a, v) => a + (v - mu) ** 2, 0) / rs.length) / (mu || 1); })(),
+    cornerPts: cornerPoints(coarse, closure < 0.3),
   };
 }

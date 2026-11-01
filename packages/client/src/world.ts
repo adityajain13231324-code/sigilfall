@@ -417,6 +417,21 @@ export class World {
     void dt;
   }
 
+  /** over-the-shoulder camera: explicit position and look target, with shake applied */
+  placeThird(pos: THREE.Vector3, target: THREE.Vector3): void {
+    const sh = this.trauma * this.trauma;
+    const nx = (Math.sin(this.time * 41) + Math.sin(this.time * 23.7)) * 0.5;
+    const ny = (Math.sin(this.time * 37 + 1.7) + Math.sin(this.time * 19.1)) * 0.5;
+    this.camera.position.set(pos.x + nx * sh * 0.25 + this.parallax.x * 0.6, pos.y + ny * sh * 0.18 + Math.sin(this.time * 1.2) * 0.02, pos.z);
+    this.camera.lookAt(target.x + this.parallax.x * 1.2, target.y + this.parallax.y * 0.8, target.z);
+    this.camera.rotateZ(nx * sh * 0.03);
+    const fov = this.baseFov + this.fovKick;
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
   /** adaptive quality: lower resolution/bloom/particles when frames get slow */
   adapt(frameMs: number): void {
     this.frameEma = this.frameEma * 0.95 + Math.min(100, frameMs) * 0.05;

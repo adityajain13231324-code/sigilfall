@@ -6,8 +6,8 @@ import { settings } from './settings';
 
 const ARC = 2 * Math.PI * 44;
 
-const KIND_COLOR: Record<string, string> = { cinder: '#ff7a2a', blast: '#ffcf4a', lance: '#a36bff', shard: '#bfe6ff', eclipse: '#ffb020', storm: '#8ff6ff' };
-const KIND_ICON: Record<string, string> = { cinder: '▲', blast: '●', lance: '◉', shard: '⬡', eclipse: '∞', storm: 'ϟ' };
+const KIND_COLOR: Record<string, string> = { cinder: '#ff7a2a', blast: '#ffcf4a', lance: '#a36bff', shard: '#bfe6ff', eclipse: '#ffb020', storm: '#8ff6ff', dart: '#aaf6ff', riptide: '#3fd0c0', crescent: '#f2e6a0', fang: '#ff5a6a', meteor: '#ffa040' };
+const KIND_ICON: Record<string, string> = { cinder: '▲', blast: '●', lance: '◉', shard: '⬡', eclipse: '∞', storm: 'ϟ', dart: 'V', riptide: '∿', crescent: '☾', fang: 'M', meteor: '★' };
 
 function bracer(cls: string, label: string, color: string): string {
   return `<div class="bracer ${cls}">
@@ -158,6 +158,8 @@ export class Hud {
     const fx: string[] = [];
     if (s.tick < foe.burnUntil) fx.push('<span style="color:#ff7a2a">BURN</span>');
     if (s.tick < foe.chillUntil) fx.push('<span style="color:#9fd8ff">CHILL</span>');
+    if (s.tick < foe.aegisUntil) fx.push('<span style="color:#ffe08a">AEGIS</span>');
+    if (foe.heal) fx.push('<span style="color:#7dffb0">MENDING</span>');
     if (foe.ward) fx.push('<span style="color:#9fd8ff">WARD</span>');
     if (foe.mirror) fx.push('<span style="color:#dfe8f5">MIRROR</span>');
     this.els['h-efx']!.innerHTML = fx.join(' ');
@@ -177,6 +179,8 @@ export class Hud {
     if (s.tick < me.chillUntil) status.push('<span style="color:#9fd8ff">CHILLED</span>');
     if (me.brokenUntil > s.tick) status.push('<span style="color:#ff6f7f">POISE BROKEN</span>');
     if (s.tick < me.weaveUntil) status.push('<span style="color:#8fffb0">SPELLWEAVE</span>');
+    if (s.tick < me.aegisUntil) status.push('<span style="color:#ffe08a">AEGIS</span>');
+    if (me.heal) status.push('<span style="color:#7dffb0">MENDING</span>');
     if (stacks > 0) status.push(`<span style="color:#ffb86f">FATIGUE ×${stacks}</span>`);
     this.els['h-status']!.innerHTML = status.join('');
 
@@ -206,7 +210,7 @@ export class Hud {
     }
     for (const st of s.strikes as StormStrike[]) {
       if (st.owner === seat) continue;
-      add('s' + st.id, st.lane, st.hit - viewTick, st.hit - st.born, 'storm');
+      add('s' + st.id, st.lane, st.hit - viewTick, st.hit - st.born, st.meteor ? 'meteor' : 'storm');
     }
     for (const [k, el] of this.chips) {
       if (!seen.has(k)) {

@@ -1,7 +1,9 @@
-import { Pt, Features, features, resample, normalize, bounds, pathLength } from './geometry';
+import { Pt, Features, features, resample, normalize, bounds, pathLength, squareness } from './geometry';
 import { Shape, SHAPES, Template, generateTemplates } from './shapes';
 
-export type SpellId = 'cinder' | 'storm' | 'ward' | 'mirror' | 'gravewell' | 'aurum' | 'umbra' | 'eclipse';
+export type SpellId =
+  | 'cinder' | 'storm' | 'ward' | 'mirror' | 'gravewell' | 'aurum' | 'umbra' | 'eclipse'
+  | 'dart' | 'riptide' | 'heal' | 'aegis' | 'crescent' | 'starfall' | 'fangs';
 export type Tier = 'rough' | 'clean' | 'perfect';
 
 export interface RecognizerConfig {
@@ -27,7 +29,7 @@ export const DEFAULT_RECOGNIZER_CONFIG: RecognizerConfig = {
   distanceScale: 0.3,
   minSize: 110,
   minPoints: 8,
-  maxDurationMs: 2600,
+  maxDurationMs: 7000,
 };
 
 export type FailReason = 'tooShort' | 'tooSmall' | 'tooSlow' | 'line' | 'scribble' | 'noMatch' | 'smudged' | 'notReady';
@@ -109,23 +111,36 @@ export function cloudMatch(a: Pt[], b: Pt[]): number {
 function gate(shape: Shape, f: Features): number {
   switch (shape) {
     case 'triangle':
-      return f.closure < 0.45 && f.turns > 0.55 && f.turns < 1.5 ? (f.corners >= 2 && f.corners <= 4 ? 1 : 0.9) : 0;
+      return f.closure < 0.45 && f.turns > 0.55 && f.turns < 1.5 && f.radialVar > 0.15 ? (f.corners >= 2 && f.corners <= 4 ? 1 : 0.9) : 0;
     case 'diamond':
       return f.closure < 0.45 && f.turns > 0.55 && f.turns < 1.5 ? (f.corners >= 3 && f.corners <= 5 ? 1 : 0.9) : 0;
+    case 'square':
+      return f.closure < 0.45 && f.turns > 0.6 && f.turns < 1.5 && f.crossings < 2 ? (f.corners >= 3 && f.corners <= 5 ? 1 : 0.9) : 0;
     case 'zigzag':
-      return f.closure > 0.45 && f.corners >= 1 && f.turns < 0.65 ? 1 : 0;
+      return f.closure > 0.45 && f.corners >= 1 && f.turns < 0.65 ? (f.corners >= 2 ? 1 : 0.88) : 0;
     case 'arch':
-      return f.closure > 0.4 && f.turns > 0.28 && f.turns < 0.85 ? 1 : 0;
+      return f.closure > 0.58 && f.turns > 0.28 && f.turns < 0.75 ? 1 : 0;
+    case 'crescent':
+      return f.closure > 0.28 && f.closure < 0.62 && f.turns > 0.5 && f.turns < 1.1 ? 1 : 0;
+    case 'vee':
+      return f.closure > 0.4 && f.turns > 0.15 && f.turns < 0.55 && f.corners >= 1 ? 1 : 0;
+    case 'wave':
+      return f.closure > 0.4 && f.turns < 0.5 && f.corners <= 2 ? 1 : 0;
+    case 'em':
+      return f.closure < 0.95 && f.turns < 0.8 && f.corners >= 2 ? 1 : 0;
+    case 'heart':
+      return f.closure < 0.45 && f.corners >= 1 && f.crossings < 3 ? (f.solidity < 0.955 && f.radialVar > 0.19 ? 1 : 0) : 0;
+    case 'star':
+      return f.crossings >= 3 && f.corners >= 3 ? 1 : 0;
     case 'circle':
-      if (f.closure > 0.4 || f.turns < 0.7 || f.turns > 1.75) return 0;
+      if (f.closure > 0.3 || f.turns < 0.7 || f.turns > 1.75 || f.radialVar > 0.115) return 0;
       if (f.turns > 1.3 && (f.radialRatio > 1.7 || f.radialRatio < 0.5)) return 0;
       return f.corners > 4 ? 0.9 : 1;
     case 'spiral':
-      // must wind inward: wide first, tighter toward the end, and not closed on itself
       return f.turns >= 1.05 && f.radialRatio >= 1.5 && f.closure > 0.2 ? 1 : 0;
     case 'infinity':
-      if (f.turns > 0.75) return 0;
-      return f.crossings >= 1 ? 1 : 0.9;
+      if (f.turns > 0.55 || f.closure > 0.5 || f.aspect < 1.25) return 0;
+      return f.crossings >= 1 ? 1 : 0.85;
   }
 }
 
@@ -138,6 +153,13 @@ export function shapeToSpell(shape: Shape, winding: 'cw' | 'ccw'): SpellId {
     case 'spiral': return 'gravewell';
     case 'circle': return winding === 'cw' ? 'aurum' : 'umbra';
     case 'infinity': return 'eclipse';
+    case 'vee': return 'dart';
+    case 'wave': return 'riptide';
+    case 'heart': return 'heal';
+    case 'square': return 'aegis';
+    case 'crescent': return 'crescent';
+    case 'star': return 'starfall';
+    case 'em': return 'fangs';
   }
 }
 
@@ -151,6 +173,13 @@ export function spellToShape(spell: SpellId): Shape {
     case 'aurum':
     case 'umbra': return 'circle';
     case 'eclipse': return 'infinity';
+    case 'dart': return 'vee';
+    case 'riptide': return 'wave';
+    case 'heal': return 'heart';
+    case 'aegis': return 'square';
+    case 'crescent': return 'crescent';
+    case 'starfall': return 'star';
+    case 'fangs': return 'em';
   }
 }
 
@@ -159,6 +188,12 @@ export function tierOf(score: number, cfg: RecognizerConfig = DEFAULT_RECOGNIZER
   if (score >= cfg.cleanScore * strictness) return 'clean';
   if (score >= cfg.minScore * strictness) return 'rough';
   return null;
+}
+
+function recognizeWinner(shape: Shape, f: Features, ranked: { shape: Shape; score: number }[], score: number): RecognitionResult {
+  const winding = f.areaSign > 0 ? 'cw' : 'ccw';
+  const tier = tierOf(score) ?? 'rough';
+  return { spell: shapeToSpell(shape, winding), shape, tier, score, ranked, winding: shape === 'circle' ? winding : undefined };
 }
 
 const fail = (reason: FailReason, ranked: { shape: Shape; score: number }[] = [], score = 0): RecognitionResult => ({
@@ -220,7 +255,25 @@ export function recognize(stroke: Pt[], opts: RecognizeOptions = {}): Recognitio
   if (second && top.score - second.score < cfg.ambiguityMargin && second.score >= cfg.minScore * strict) {
     // resolve ambiguity with structure: corner count separates triangle/diamond, everything else is smudged
     const pair = [top.shape, second.shape].sort().join('+');
-    const expectCorners: Partial<Record<Shape, number>> = { circle: 0, triangle: 3, diamond: 4 };
+    const expectCorners: Partial<Record<Shape, number>> = { circle: 0, triangle: 3, diamond: 4, square: 4 };
+    const pairSet = new Set([top.shape, second.shape]);
+    if (pairSet.has('heart')) {
+      const other = top.shape === 'heart' ? second.shape : top.shape;
+      winner = { shape: other === 'triangle' ? (f.radialVar > 0.27 ? 'heart' : 'triangle') : 'heart', score: top.score };
+      const w2 = winner;
+      void w2;
+      const win = recognizeWinner(winner.shape, f, ranked, top.score);
+      return win;
+    }
+    if (pairSet.has('diamond') && pairSet.has('square') && f.cornerPts.length >= 3) {
+      const sq = squareness(f.cornerPts, stroke) > 0;
+      winner = { shape: sq ? 'square' : 'diamond', score: top.score };
+      return recognizeWinner(winner.shape, f, ranked, top.score);
+    }
+    if (pairSet.has('circle') && (pairSet.has('square') || pairSet.has('diamond') || pairSet.has('triangle'))) {
+      const poly = top.shape === 'circle' ? second.shape : top.shape;
+      return recognizeWinner(f.radialVar < 0.085 ? 'circle' : poly, f, ranked, top.score);
+    }
     const a = expectCorners[top.shape];
     const b = expectCorners[second.shape];
     if (a !== undefined && b !== undefined) {
@@ -328,7 +381,7 @@ export function predictPrefix(stroke: Pt[], allowed: Shape[] = SHAPES): { spell:
   if (!prefixCache) {
     prefixCache = [];
     for (const shape of SHAPES) {
-      const handed = shape === 'circle' || shape === 'spiral' || shape === 'infinity';
+      const handed = shape === 'circle' || shape === 'spiral' || shape === 'infinity' || shape === 'crescent';
       for (const w of handed ? (['cw', 'ccw'] as const) : (['cw'] as const)) {
         prefixCache.push({ spell: shapeToSpell(shape, w), shape, full: canonical(shape, w) });
       }

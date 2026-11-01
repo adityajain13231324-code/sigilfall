@@ -15,15 +15,17 @@ interface Profile {
   eclipseAmbition: number;
   tiers: [number, number, number]; // rough/clean/perfect weights
   noise: number;
+  /** ticks the AI waits after committing to a cast before thinking again (lower = more aggressive) */
+  tempo: [number, number];
 }
 
 export const PROFILES: Record<Difficulty, Profile> = {
-  apprentice: { react: [9, 14], fizzle: 0.14, feint: 0, drawMult: 1.4, adapt: 0, blinkSkill: 0.5, counterSkill: 0.15, eclipseAmbition: 0.25, tiers: [0.35, 0.55, 0.1], noise: 0.5 },
-  adept: { react: [6, 10], fizzle: 0.06, feint: 0.03, drawMult: 1.0, adapt: 0.6, blinkSkill: 0.78, counterSkill: 0.55, eclipseAmbition: 0.6, tiers: [0.15, 0.6, 0.25], noise: 0.3 },
-  archmage: { react: [4, 7], fizzle: 0.025, feint: 0.16, drawMult: 0.8, adapt: 1, blinkSkill: 0.93, counterSkill: 0.85, eclipseAmbition: 0.9, tiers: [0.05, 0.5, 0.45], noise: 0.18 },
+  apprentice: { react: [14, 24], fizzle: 0.24, feint: 0, drawMult: 1.8, adapt: 0, blinkSkill: 0.22, counterSkill: 0.04, eclipseAmbition: 0.04, tiers: [0.5, 0.45, 0.05], noise: 0.6, tempo: [45, 100] },
+  adept: { react: [8, 13], fizzle: 0.08, feint: 0.03, drawMult: 1.1, adapt: 0.6, blinkSkill: 0.62, counterSkill: 0.4, eclipseAmbition: 0.4, tiers: [0.15, 0.6, 0.25], noise: 0.3, tempo: [18, 50] },
+  archmage: { react: [4, 7], fizzle: 0.025, feint: 0.16, drawMult: 0.8, adapt: 1, blinkSkill: 0.93, counterSkill: 0.85, eclipseAmbition: 0.9, tiers: [0.05, 0.5, 0.45], noise: 0.18, tempo: [4, 18] },
 };
 
-const DRAW_TICKS: Record<SpellId, number> = { cinder: 13, storm: 15, ward: 13, mirror: 14, gravewell: 27, aurum: 17, umbra: 17, eclipse: 29 };
+const DRAW_TICKS: Record<SpellId, number> = { cinder: 13, storm: 15, ward: 13, mirror: 14, gravewell: 27, aurum: 17, umbra: 17, eclipse: 29, dart: 10, riptide: 14, heal: 20, aegis: 14, crescent: 16, starfall: 24, fangs: 20 };
 
 interface Plan {
   spell: SpellId;
@@ -132,6 +134,7 @@ export class WizardAI implements Bot {
           if (pl.feint) cmds.push({ t: 'drawCancel' });
           else cmds.push({ t: 'cast', spell: pl.fizzle ? null : pl.spell, tier: pl.tier });
           this.plan = null;
+          this.nextThink = s.tick + this.p.tempo[0] + Math.floor(this.rng() * (this.p.tempo[1] - this.p.tempo[0] + 1));
         }
         return cmds;
       }
@@ -306,6 +309,15 @@ export class WizardAI implements Bot {
     const passive = fw.state === 'idle' && s.tick - fw.lastCastTick > T(3);
     if (!holdsOrb(s, me, 'aurum')) add('aurum', 0.35 + (passive ? 0.5 : 0) + (holdsOrb(s, me, 'umbra') ? 0.5 * this.p.eclipseAmbition : 0));
     if (!holdsOrb(s, me, 'umbra')) add('umbra', 0.3 + (passive ? 0.4 : 0) + (holdsOrb(s, me, 'aurum') ? 0.5 * this.p.eclipseAmbition : 0));
+
+    const hurt = w.vit < 55;
+    add('dart', 0.4 + (wardUp ? 0.9 : 0));
+    add('riptide', 0.3 + (fw.state === 'idle' ? 0.1 : 0));
+    add('crescent', 0.4);
+    add('fangs', 0.35);
+    add('starfall', 0.3 + (fw.lane !== 1 ? 0.1 : 0));
+    if (w.vit < 78) add('heal', hurt ? 1.5 : 0.5);
+    if (!(s.tick < w.aegisUntil)) add('aegis', (hurt ? 0.5 : 0.05) + (fw.state === 'windup' ? 0.4 : 0));
 
     // variety: reward spells I have not cast lately (Spellweave)
     for (const sp of score.keys()) {

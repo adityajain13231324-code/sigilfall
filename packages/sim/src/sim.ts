@@ -14,13 +14,13 @@ interface Ctx {
   ev: SimEvent[];
 }
 
-export const SPELLS: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewell', 'aurum', 'umbra', 'eclipse'];
+export const SPELLS: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewell', 'aurum', 'umbra', 'eclipse', 'dart', 'riptide', 'heal', 'aegis', 'crescent', 'starfall', 'fangs'];
 
 function newWizard(): Wizard {
   return {
     vit: bal.vitality, aether: bal.aether, poise: bal.poise, lane: 1, state: 'idle', stateUntil: 0, oath: null,
     windup: null, draw: null, cooldowns: {}, blinkReady: 0, blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0,
-    lastHit: -9999, brokenUntil: 0, openUntil: 0, orbs: { aurum: 0, umbra: 0 }, ward: null, mirror: null, burnUntil: 0,
+    lastHit: -9999, brokenUntil: 0, openUntil: 0, aegisUntil: 0, heal: null, orbs: { aurum: 0, umbra: 0 }, ward: null, mirror: null, burnUntil: 0,
     burnPhase: 0, chillUntil: 0, lastSpell: null, lastCastTick: -9999, fatigue: 0, recent: [], weaveUntil: 0,
     echoNext: false, casts: 0, stats: { damageDealt: 0, casts: {} },
   };
@@ -238,7 +238,7 @@ function newProj(ctx: Ctx, owner: PlayerId, kind: ProjKind, lane: Lane, travelTi
   const { s, ev } = ctx;
   const pr: Projectile = {
     id: s.nextId++, owner, kind, lane, born: s.tick, arrive: s.tick + Math.max(2, travelTicks), dmg, poise, burn: false,
-    pierce: false, noReflect: false, reflected: false, ...extra,
+    pierce: false, noReflect: false, reflected: false, wide: false, chill: false, ...extra,
   };
   s.projectiles.push(pr);
   ev.push({ type: 'projectile', p: owner, id: pr.id, kind, lane, eta: pr.arrive - s.tick });
@@ -269,7 +269,7 @@ function release(ctx: Ctx, p: PlayerId, wu: Windup): void {
     }
     case 'storm': {
       const c = bal.spells.storm;
-      const st = { id: s.nextId++, owner: p, lane, born: s.tick, hit: s.tick + T(c.telegraph), dmg: c.damage * wu.power, poise: c.poise };
+      const st = { id: s.nextId++, owner: p, lane, born: s.tick, hit: s.tick + T(c.telegraph), dmg: c.damage * wu.power, poise: c.poise, meteor: false };
       s.strikes.push(st);
       ev.push({ type: 'stormMark', p, lane, hit: st.hit });
       break;
@@ -314,6 +314,50 @@ function release(ctx: Ctx, p: PlayerId, wu: Windup): void {
       const c = bal.spells[sp];
       w.orbs[sp] = s.tick + T(c.orbSeconds);
       ev.push({ type: 'orbCreated', p, which: sp });
+      break;
+    }
+    case 'dart': {
+      const c = bal.spells.dart;
+      newProj(ctx, p, 'dart', lane, T(c.travel), c.damage * wu.power, c.poise, { pierce: true });
+      break;
+    }
+    case 'riptide': {
+      const c = bal.spells.riptide;
+      newProj(ctx, p, 'riptide', lane, T(c.travel), c.damage * wu.power, c.poise, { chill: true });
+      break;
+    }
+    case 'crescent': {
+      const c = bal.spells.crescent;
+      newProj(ctx, p, 'crescent', lane, T(c.travel), c.damage * wu.power, c.poise, { wide: true });
+      break;
+    }
+    case 'fangs': {
+      const c = bal.spells.fangs;
+      const others = ([0, 1, 2] as Lane[]).filter((l) => l !== lane);
+      const second = others[Math.floor(rand(s) * others.length)]!;
+      newProj(ctx, p, 'fang', lane, T(c.travel), c.damage * wu.power, c.poise);
+      newProj(ctx, p, 'fang', second, T(c.travel2), c.damage * wu.power, c.poise);
+      break;
+    }
+    case 'heal': {
+      const c = bal.spells.heal;
+      w.burnUntil = 0;
+      w.heal = { until: s.tick + T(c.seconds), perTick: (c.amount * wu.power) / T(c.seconds) };
+      break;
+    }
+    case 'aegis': {
+      w.aegisUntil = s.tick + T(bal.spells.aegis.seconds);
+      ev.push({ type: 'aegis', p });
+      break;
+    }
+    case 'starfall': {
+      const c = bal.spells.starfall;
+      const order = ([0, 1, 2] as Lane[]).sort(() => rand(s) - 0.5);
+      order.forEach((l, i) => {
+        const st = { id: s.nextId++, owner: p, lane: l, born: s.tick, hit: s.tick + T(c.telegraph) + i * T(c.gap), dmg: c.damage * wu.power, poise: c.poise, meteor: true };
+        s.strikes.push(st);
+        ev.push({ type: 'stormMark', p, lane: l, hit: st.hit });
+      });
       break;
     }
     case 'eclipse': {
@@ -380,6 +424,13 @@ function tickWizard(ctx: Ctx, p: PlayerId): void {
     ev.push({ type: 'hit', p, kind: 'burn', dmg: bal.spells.cinder.burnDps / 2, poise: 0, lane: w.lane });
     if (w.vit <= 0) w.state = 'dead';
   }
+  if (w.heal) {
+    if (s.tick >= w.heal.until) w.heal = null;
+    else {
+      w.vit = Math.min(bal.vitality, w.vit + w.heal.perTick);
+      if ((w.heal.until - s.tick) % 15 === 0) ev.push({ type: 'heal', p, amount: w.heal.perTick * 15 });
+    }
+  }
   // regen
   if (s.tick >= w.regenFrom && w.state !== 'dead') {
     const mult = s.tick < w.weaveUntil ? bal.weave.regenMult : 1;
@@ -441,6 +492,10 @@ function damage(ctx: Ctx, target: PlayerId, amount: number, poiseDmg: number, ki
   let dmg = amount;
   if (w.brokenUntil > s.tick) dmg *= bal.breakDamageMult;
   if (w.openUntil > s.tick) dmg *= bal.spells.gravewell.openDamageMult;
+  if (s.tick < w.aegisUntil) {
+    dmg *= bal.spells.aegis.damageMult;
+    poiseDmg *= bal.spells.aegis.poiseMult;
+  }
   w.vit = Math.max(0, w.vit - dmg);
   s.w[src].stats.damageDealt += dmg;
   w.lastHit = s.tick;
@@ -481,8 +536,23 @@ function tickStrikes(ctx: Ctx): void {
     const ew = s.w[foe];
     const c = bal.spells.storm;
     const stands = ew.lane === st.lane && s.tick >= ew.invulnUntil && ew.state !== 'dead';
-    ev.push({ type: 'stormStrike', p: st.owner, lane: st.lane, hit: stands });
+    ev.push({ type: 'stormStrike', p: st.owner, lane: st.lane, hit: stands, meteor: st.meteor });
     if (!stands) continue;
+    if (st.meteor) {
+      if (ew.ward) {
+        ew.ward.hp -= st.dmg;
+        ev.push({ type: 'wardAbsorb', p: foe, hp: Math.max(0, ew.ward.hp), crit: false });
+        if (ew.ward.hp <= 0) breakWard(ctx, foe);
+      } else {
+        damage(ctx, foe, st.dmg, st.poise, 'meteor', st.lane, st.owner);
+        if (ew.state !== 'dead') {
+          ew.burnUntil = s.tick + T(2);
+          ew.burnPhase = s.tick;
+          ev.push({ type: 'burn', p: foe });
+        }
+      }
+      continue;
+    }
     let dmg = st.dmg;
     let combo = false;
     if (s.tick < ew.burnUntil) {
@@ -582,7 +652,7 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
       return;
     }
   }
-  if (def.lane !== pr.lane) {
+  if (Math.abs(def.lane - pr.lane) > (pr.wide ? 1 : 0)) {
     ev.push({ type: 'dodge', p: defId, id: pr.id });
     return;
   }
@@ -618,6 +688,10 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
     def.burnPhase = s.tick;
     ev.push({ type: 'burn', p: defId });
   }
+  if (pr.chill) {
+    def.chillUntil = s.tick + T(bal.spells.riptide.chillSeconds);
+    ev.push({ type: 'chill', p: defId });
+  }
   if (pr.kind === 'blast') {
     const from = def.lane;
     const to: Lane = from === 1 ? (rand(s) < 0.5 ? 0 : 2) : 1;
@@ -636,7 +710,7 @@ function tickTide(ctx: Ctx): void {
   const { s, ev } = ctx;
   if (s.tide && s.tick >= s.tide.until) s.tide = null;
   if (s.tick >= s.nextTide) {
-    const pool: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewell', 'aurum'];
+    const pool: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewell', 'aurum', 'dart', 'crescent', 'fangs'];
     const spell = pool[Math.floor(rand(s) * pool.length)]!;
     s.tide = { spell, until: s.tick + T(bal.tide.durationSeconds) };
     s.nextTide = s.tick + T(bal.tide.everySeconds);

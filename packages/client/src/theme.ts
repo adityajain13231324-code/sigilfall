@@ -21,10 +21,17 @@ export const SPELL_INFO: Record<SpellId, SpellInfo> = {
   gravewell: { id: 'gravewell', name: 'Gravewell', short: 'Gravewell', color: 0x9b5cff, css: '#9b5cff', icon: '◉', shape: 'spiral', blurb: 'Collapses incoming projectiles, pops enemy orbs and interrupts a channel. You are open for 1s.', counters: 'Long cooldown (10s) and a heavy windup.' },
   aurum: { id: 'aurum', name: 'Aurum Orb', short: 'Aurum', color: 0xffcf4a, css: '#ffcf4a', icon: '●', shape: 'circle', blurb: 'Draw a circle clockwise. A gold orb you can fire as a Knockback Blast that shoves one lane and cancels a draw.', counters: 'Visible to the opponent. Gravewell pops it.' },
   umbra: { id: 'umbra', name: 'Umbra Orb', short: 'Umbra', color: 0xa36bff, css: '#a36bff', icon: '○', shape: 'circle', blurb: 'Draw a circle counter-clockwise. A violet orb that fires a Pull Lance, dragging incoming projectiles aside.', counters: 'Visible to the opponent. Gravewell pops it.' },
+  dart: { id: 'dart', name: 'Piercing Dart', short: 'Dart', color: 0xaaf6ff, css: '#aaf6ff', icon: 'V', shape: 'vee', blurb: 'A very fast needle of light. Weak, cheap, and it slips straight through Glacier Ward.', counters: 'Blink, Mirrorveil, or just out-trade it with bigger spells.' },
+  riptide: { id: 'riptide', name: 'Riptide Lash', short: 'Riptide', color: 0x3fd0c0, css: '#3fd0c0', icon: '∿', shape: 'wave', blurb: 'Draw a wave. A water bolt that Chills the target: their casting is 25% slower for 3 seconds.', counters: 'Ward absorbs it; reflect it to chill the caster instead.' },
+  heal: { id: 'heal', name: 'Mending Light', short: 'Mend', color: 0x7dffb0, css: '#7dffb0', icon: '♥', shape: 'heart', blurb: 'Draw a heart. Restores 24 Vitality over 2 seconds and douses Burn. Long cooldown.', counters: 'The windup is a window to punish; Stormfork interrupts it.' },
+  aegis: { id: 'aegis', name: 'Aegis', short: 'Aegis', color: 0xffe08a, css: '#ffe08a', icon: '▢', shape: 'square', blurb: 'Draw a square. For 4 seconds you take 40% less damage and half the Poise damage.', counters: 'Gravewell and Eclipse still hurt; wait it out or burn it down with Starfall.' },
+  crescent: { id: 'crescent', name: 'Moonblade', short: 'Moon', color: 0xf2e6a0, css: '#f2e6a0', icon: '☾', shape: 'crescent', blurb: 'Draw a C. A wide blade that hits your lane and the neighbouring lanes. One Blink is not enough.', counters: 'Ward, Mirrorveil, or Blink two lanes away.' },
+  starfall: { id: 'starfall', name: 'Starfall', short: 'Starfall', color: 0xffa040, css: '#ffa040', icon: '★', shape: 'star', blurb: 'Draw a star. Meteors mark all three lanes and land one after another. Keep moving.', counters: 'Ward absorbs them; time your Blinks between impacts.' },
+  fangs: { id: 'fangs', name: 'Twin Fangs', short: 'Fangs', color: 0xff5a6a, css: '#ff5a6a', icon: 'M', shape: 'em', blurb: 'Draw an M. Two fangs strike different lanes at different speeds.', counters: 'Mirrorveil catches one; dodge the other.' },
   eclipse: { id: 'eclipse', name: 'Eclipse Rend', short: 'Eclipse', color: 0xffb020, css: '#ffb020', icon: '∞', shape: 'infinity', blurb: 'Hold both orbs and draw a figure-eight. Channel 2.5s, then 55 damage and a Poise break.', counters: 'Gravewell collapses it. Stormfork or Aurum interrupt the channel. Blink late.' },
 };
 
-export const SPELL_ORDER: SpellId[] = ['cinder', 'storm', 'ward', 'mirror', 'gravewell', 'aurum', 'umbra', 'eclipse'];
+export const SPELL_ORDER: SpellId[] = ['cinder', 'dart', 'storm', 'fangs', 'riptide', 'crescent', 'ward', 'aegis', 'mirror', 'heal', 'starfall', 'gravewell', 'aurum', 'umbra', 'eclipse'];
 
 export const FAMILY_COLOR: Record<string, number> = { warm: 0xffa040, cold: 0x8fe6ff, silver: 0xe6eefc, dark: 0xa070ff };
 export const LANE_NAMES = ['Left', 'Center', 'Right'];

@@ -16,13 +16,14 @@ export interface Settings {
   captions: boolean;
   strictness: number;
   difficulty: Difficulty;
+  view: 'third' | 'first';
 }
 
 const DEFAULTS: Settings = {
   master: 0.8, sfx: 0.9, music: 0.5, mute: false, clarity: false,
   reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
   colorBlind: false, uiScale: 1, planeScale: 1, clickToDraw: false, pauseCast: false, quickCast: false,
-  captions: false, strictness: 1, difficulty: 'adept',
+  captions: false, strictness: 1, difficulty: 'apprentice', view: 'third',
 };
 
 const KEY = 'sigilfall.settings.v1';

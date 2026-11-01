@@ -12,6 +12,7 @@ export type WizState = 'idle' | 'drawing' | 'windup' | 'recovery' | 'channeling'
 export type TellFamily = 'warm' | 'cold' | 'silver' | 'dark';
 export const TELL_FAMILY: Record<SpellId, TellFamily> = {
   cinder: 'warm', aurum: 'warm', storm: 'cold', ward: 'cold', mirror: 'silver', gravewell: 'dark', umbra: 'dark', eclipse: 'dark',
+  dart: 'cold', riptide: 'cold', heal: 'silver', aegis: 'silver', crescent: 'silver', starfall: 'warm', fangs: 'warm',
 };
 
 export type Cmd =
@@ -25,7 +26,7 @@ export type Cmd =
 
 export type RejectReason = 'busy' | 'cooldown' | 'aether' | 'orbs' | 'held' | 'noOrb' | 'blink' | 'dead' | 'late';
 
-export type ProjKind = 'cinder' | 'blast' | 'lance' | 'shard' | 'eclipse';
+export type ProjKind = 'cinder' | 'blast' | 'lance' | 'shard' | 'eclipse' | 'dart' | 'riptide' | 'crescent' | 'fang';
 
 export interface Projectile {
   id: number;
@@ -40,6 +41,10 @@ export interface Projectile {
   pierce: boolean;
   noReflect: boolean;
   reflected: boolean;
+  /** hits the target lane and its neighbours */
+  wide: boolean;
+  /** applies Chill on hit */
+  chill: boolean;
 }
 
 export interface StormStrike {
@@ -50,6 +55,8 @@ export interface StormStrike {
   hit: number;
   dmg: number;
   poise: number;
+  /** Starfall meteor rather than Stormfork lightning */
+  meteor: boolean;
 }
 
 export interface Well {
@@ -95,6 +102,8 @@ export interface Wizard {
   mirror: { start: number; until: number; hit: boolean; prism: boolean } | null;
   burnUntil: number;
   burnPhase: number;
+  aegisUntil: number;
+  heal: { until: number; perTick: number } | null;
   chillUntil: number;
   lastSpell: SpellId | null;
   lastCastTick: number;
@@ -130,7 +139,7 @@ export type SimEvent =
   | { type: 'release'; p: PlayerId; spell: SpellId; lane: Lane }
   | { type: 'projectile'; p: PlayerId; id: number; kind: ProjKind; lane: Lane; eta: number }
   | { type: 'stormMark'; p: PlayerId; lane: Lane; hit: number }
-  | { type: 'stormStrike'; p: PlayerId; lane: Lane; hit: boolean }
+  | { type: 'stormStrike'; p: PlayerId; lane: Lane; hit: boolean; meteor?: boolean }
   | { type: 'ward'; p: PlayerId }
   | { type: 'wardAbsorb'; p: PlayerId; hp: number; crit: boolean }
   | { type: 'wardBreak'; p: PlayerId }
@@ -146,7 +155,7 @@ export type SimEvent =
   | { type: 'eclipseInterrupt'; p: PlayerId }
   | { type: 'blink'; p: PlayerId; from: Lane; to: Lane }
   | { type: 'dodge'; p: PlayerId; id: number }
-  | { type: 'hit'; p: PlayerId; kind: ProjKind | 'storm' | 'burn' | 'wellspring' | 'gravewell'; dmg: number; poise: number; lane: Lane }
+  | { type: 'hit'; p: PlayerId; kind: ProjKind | 'storm' | 'meteor' | 'burn' | 'wellspring' | 'gravewell'; dmg: number; poise: number; lane: Lane }
   | { type: 'shove'; p: PlayerId; from: Lane; to: Lane }
   | { type: 'drawCancelled'; p: PlayerId }
   | { type: 'break'; p: PlayerId }
@@ -157,5 +166,7 @@ export type SimEvent =
   | { type: 'tide'; spell: SpellId }
   | { type: 'burn'; p: PlayerId }
   | { type: 'chill'; p: PlayerId }
+  | { type: 'heal'; p: PlayerId; amount: number }
+  | { type: 'aegis'; p: PlayerId }
   | { type: 'oath'; p: PlayerId; oath: Oath }
   | { type: 'over'; winner: PlayerId | null; reason: 'ko' | 'timeout' | 'draw' };

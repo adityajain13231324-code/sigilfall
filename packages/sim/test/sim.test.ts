@@ -480,3 +480,82 @@ describe('spam is unreliable', () => {
     expect(found).toBe(true);
   });
 });
+
+describe('expanded sigil library', () => {
+  it('Piercing Dart ignores a Glacier Ward', () => {
+    const r = new Rig();
+    r.cast(1, 'ward');
+    r.wait(0);
+    r.cast(0, 'dart');
+    r.until(() => r.has('hit', (e) => e.kind === 'dart'), 100);
+    expect(r.s.w[1].vit).toBeLessThan(100);
+    expect(r.s.w[1].ward!.hp).toBeCloseTo(r.s.w[1].ward!.max * 1.1, 0);
+  });
+
+  it('Riptide chills the target, slowing their next windup', () => {
+    const r = new Rig();
+    r.cast(0, 'riptide');
+    r.until(() => r.has('chill', (e) => e.p === 1), 100);
+    expect(r.s.w[1].chillUntil).toBeGreaterThan(r.s.tick);
+  });
+
+  it('Mending Light heals over time and douses Burn', () => {
+    const r = new Rig();
+    r.s.w[0].vit = 50;
+    r.s.w[0].burnUntil = 999;
+    r.s.w[0].burnPhase = 1;
+    r.cast(0, 'heal', 'clean');
+    r.run(70);
+    expect(r.s.w[0].vit).toBeGreaterThan(70);
+    expect(r.s.w[0].burnUntil).toBe(0);
+  });
+
+  it('Aegis cuts incoming damage', () => {
+    const plain = new Rig();
+    plain.cast(0, 'cinder', 'clean');
+    plain.until(() => plain.s.w[1].vit < 100, 100);
+    const guarded = new Rig();
+    guarded.cast(1, 'aegis');
+    guarded.wait(0);
+    guarded.cast(0, 'cinder', 'clean');
+    guarded.until(() => guarded.s.w[1].vit < 100, 100);
+    expect(100 - guarded.s.w[1].vit).toBeLessThan((100 - plain.s.w[1].vit) * 0.75);
+  });
+
+  it('Crescent is wide: a one-lane Blink does not escape it', () => {
+    const r = new Rig();
+    r.cast(0, 'crescent');
+    r.until(() => r.s.projectiles[0]!.arrive - r.s.tick <= 10);
+    r.send(1, { t: 'blink', dir: 1 });
+    r.until(() => r.has('hit', (e) => e.kind === 'crescent') || r.s.projectiles.length === 0, 100);
+    expect(r.s.w[1].lane).toBe(2);
+    expect(r.has('hit', (e) => e.kind === 'crescent')).toBe(true);
+  });
+
+  it('Starfall marks all three lanes one after another; standing still is punished', () => {
+    const r = new Rig();
+    r.cast(0, 'starfall');
+    expect(r.s.strikes.length).toBe(3);
+    expect(new Set(r.s.strikes.map((s) => s.lane)).size).toBe(3);
+    r.run(70);
+    expect(r.has('hit', (e) => e.kind === 'meteor')).toBe(true);
+    expect(r.s.w[1].vit).toBeLessThan(100);
+  });
+
+  it('Twin Fangs launch two projectiles into different lanes', () => {
+    const r = new Rig();
+    r.cast(0, 'fangs');
+    const fangs = r.s.projectiles.filter((p) => p.kind === 'fang');
+    expect(fangs.length).toBe(2);
+    expect(fangs[0]!.lane).not.toBe(fangs[1]!.lane);
+  });
+
+  it('the draw window is a relaxed 6 seconds', () => {
+    const r = new Rig();
+    r.send(0, { t: 'drawStart' });
+    r.run(150);
+    expect(r.s.w[0].state).toBe('drawing');
+    r.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
+    expect(r.s.w[0].state).toBe('windup');
+  });
+});

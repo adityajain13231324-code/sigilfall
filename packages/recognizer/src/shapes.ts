@@ -1,7 +1,7 @@
 import { Pt, makeRng, resample, normalize } from './geometry';
 
-export type Shape = 'triangle' | 'zigzag' | 'arch' | 'diamond' | 'spiral' | 'circle' | 'infinity';
-export const SHAPES: Shape[] = ['triangle', 'zigzag', 'arch', 'diamond', 'spiral', 'circle', 'infinity'];
+export type Shape = 'triangle' | 'zigzag' | 'arch' | 'diamond' | 'spiral' | 'circle' | 'infinity' | 'vee' | 'wave' | 'heart' | 'square' | 'crescent' | 'star' | 'em';
+export const SHAPES: Shape[] = ['triangle', 'zigzag', 'arch', 'diamond', 'spiral', 'circle', 'infinity', 'vee', 'wave', 'heart', 'square', 'crescent', 'star', 'em'];
 
 export type Winding = 'cw' | 'ccw';
 
@@ -51,6 +51,44 @@ export function canonical(shape: Shape, winding: Winding = 'cw'): Pt[] {
       });
       break;
     }
+    case 'vee':
+      pts = densify(poly([[0, 0], [0.5, 1], [1, 0]], false));
+      break;
+    case 'wave':
+      pts = Array.from({ length: 80 }, (_, i) => {
+        const u = i / 79;
+        return { x: u, y: 0.5 + 0.38 * Math.sin(u * Math.PI * 2) };
+      });
+      break;
+    case 'heart':
+      pts = Array.from({ length: 97 }, (_, i) => {
+        const t = Math.PI + (2 * Math.PI * i) / 96; // start at the bottom point
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        const px = 0.5 + x / 34;
+        let py = 0.46 - y / 34;
+        const dx = Math.abs(px - 0.5);
+        if (dx < 0.13 && py < 0.4) py += 0.11 * (1 - dx / 0.13); // deepen the cleft so it reads as a heart
+        return { x: px, y: py };
+      });
+      break;
+    case 'square':
+      pts = densify(poly([[0, 0], [1, 0], [1, 1], [0, 1]], true));
+      break;
+    case 'crescent':
+      pts = Array.from({ length: 70 }, (_, i) => {
+        const a = (-30 - (300 * i) / 69) * (Math.PI / 180);
+        return { x: 0.5 + 0.5 * Math.cos(a), y: 0.5 + 0.5 * Math.sin(a) };
+      });
+      break;
+    case 'star': {
+      const order = [0, 2, 4, 1, 3, 0];
+      pts = densify(poly(order.map((k) => [0.5 + 0.5 * Math.cos(-Math.PI / 2 + (k * 2 * Math.PI) / 5), 0.52 + 0.5 * Math.sin(-Math.PI / 2 + (k * 2 * Math.PI) / 5)] as [number, number]), false), 100);
+      break;
+    }
+    case 'em':
+      pts = densify(poly([[0, 1], [0, 0], [0.5, 0.65], [1, 0], [1, 1]], false));
+      break;
     case 'infinity':
       // lemniscate on its side, starting at the left tip and sweeping up-and-right through the crossing
       pts = Array.from({ length: 97 }, (_, i) => {
@@ -149,7 +187,7 @@ function noiseWrap(rng: () => number, amp: number) {
   return smoothNoiseField(rng, amp);
 }
 
-const CLOSED: Shape[] = ['triangle', 'diamond', 'circle', 'infinity'];
+const CLOSED: Shape[] = ['triangle', 'diamond', 'circle', 'infinity', 'square', 'heart', 'star'];
 export const isClosedShape = (s: Shape) => CLOSED.includes(s);
 
 export const TEMPLATES_PER_SHAPE = 10;
@@ -162,7 +200,7 @@ export function generateTemplates(seed = 1337, perShape = TEMPLATES_PER_SHAPE): 
     out.push({ shape, pts: normalize(resample(canonical(shape), 32)) });
     if (shape === 'circle' || shape === 'spiral' || shape === 'infinity') out.push({ shape, pts: normalize(resample(canonical(shape, 'ccw'), 32)) });
     for (let i = 0; i < perShape; i++) {
-      const handed = shape === 'spiral' || shape === 'circle' || shape === 'infinity';
+      const handed = shape === 'spiral' || shape === 'circle' || shape === 'infinity' || shape === 'crescent';
       const winding: Winding = handed && i % 2 === 1 ? 'ccw' : 'cw';
       const base = canonical(shape, winding);
       const v = jitter(base, rng, TEMPLATE_JITTER, isClosedShape(shape) && shape !== 'infinity');
