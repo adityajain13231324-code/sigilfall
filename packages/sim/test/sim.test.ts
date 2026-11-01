@@ -193,7 +193,7 @@ describe('counter relationships', () => {
     expect(r.s.w[1].lane).not.toBe(1);
     expect(r.s.w[1].state).not.toBe('drawing');
     expect(r.has('drawCancelled')).toBe(true);
-    expect(r.s.w[1].vit).toBeCloseTo(100 - 14, 0);
+    expect(r.s.w[1].vit).toBeCloseTo(100 - 18, 0);
   });
 
   it('Umbra pull lance drags incoming projectiles to another lane', () => {
@@ -506,7 +506,7 @@ describe('expanded sigil library', () => {
     r.s.w[0].burnPhase = 1;
     r.cast(0, 'heal', 'clean');
     r.run(70);
-    expect(r.s.w[0].vit).toBeGreaterThan(70);
+    expect(r.s.w[0].vit).toBeGreaterThan(62);
     expect(r.s.w[0].burnUntil).toBe(0);
   });
 

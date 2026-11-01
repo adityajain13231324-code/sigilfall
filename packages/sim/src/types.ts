@@ -112,7 +112,7 @@ export interface Wizard {
   weaveUntil: number;
   echoNext: boolean;
   casts: number;
-  stats: { damageDealt: number; casts: Partial<Record<SpellId, number>> };
+  stats: { damageDealt: number; casts: Partial<Record<SpellId, number>>; byKind?: Record<string, number> };
 }
 
 export interface DuelState {

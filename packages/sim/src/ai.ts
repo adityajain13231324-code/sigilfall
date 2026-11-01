@@ -54,6 +54,8 @@ export class WizardAI implements Bot {
   private nextThink = 0;
   private p: Profile;
   private lastOffense: SpellId | null = null;
+  /** spells this AI refuses to cast (used by balance experiments) */
+  banned = new Set<SpellId>();
 
   constructor(public me: PlayerId, public difficulty: Difficulty = 'adept', seed = 1) {
     this.rng = makeRng(seed * 7919 + me);
@@ -167,11 +169,13 @@ export class WizardAI implements Bot {
       if (w.ward && !pr.pierce && pr.kind !== 'eclipse') continue;
       const e = pr.arrive - s.tick;
       const lead = pr.kind === 'eclipse' ? 7 : 11;
-      if (e <= lead && e >= 2 && this.noticed('p' + pr.id, s)) return true;
+      const aware = this.noticed('p' + pr.id, s); // reaction time starts when the threat appears, not when it is close
+      if (e <= lead && e >= 2 && aware) return true;
     }
     for (const st of s.strikes) {
       if (st.owner === this.me || st.lane !== w.lane) continue;
-      if (st.hit - s.tick <= 10 && this.noticed('s' + st.id, s)) return true;
+      const aware = this.noticed('s' + st.id, s);
+      if (st.hit - s.tick <= 10 && aware) return true;
     }
     return false;
   }
@@ -196,6 +200,7 @@ export class WizardAI implements Bot {
 
   private ready(s: DuelState, sp: SpellId, tier: Tier = 'clean'): boolean {
     const w = s.w[this.me];
+    if (this.banned.has(sp)) return false;
     if (cooldownLeft(s, this.me, sp)) return false;
     if (sp === 'eclipse' && !hasBothOrbs(s, this.me)) return false;
     if ((sp === 'aurum' || sp === 'umbra') && holdsOrb(s, this.me, sp)) return false;

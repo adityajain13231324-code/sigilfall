@@ -498,6 +498,8 @@ function damage(ctx: Ctx, target: PlayerId, amount: number, poiseDmg: number, ki
   }
   w.vit = Math.max(0, w.vit - dmg);
   s.w[src].stats.damageDealt += dmg;
+  const bk = (s.w[src].stats.byKind ??= {});
+  bk[kind] = (bk[kind] ?? 0) + dmg;
   w.lastHit = s.tick;
   ev.push({ type: 'hit', p: target, kind, dmg, poise: poiseDmg, lane });
   if (w.vit <= 0) {

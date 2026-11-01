@@ -5,22 +5,22 @@
 | Spell | Aether | Windup | Cooldown | Effect |
 |---|---|---|---|---|
 | Cinder Bolt | 10 | 0.35 s | 0.8 s | 9 dmg, 4 Poise, 0.7 s travel, Burn 2/s for 3 s |
-| Stormfork | 22 | 0.5 s (+0.35 s telegraph) | 2 s | 16 dmg, 20 Poise, ignores 50% of Ward absorb |
+| Stormfork | 22 | 0.5 s (+0.55 s telegraph) | 2.5 s | 16 dmg, 16 Poise, ignores 50% of Ward absorb |
 | Glacier Ward | 18 | 0.4 s | 6 s | 30 absorb, 4 s, fire ×1.5, breaks into 3 shards (6 dmg) |
 | Mirrorveil | 25 | 0.2 s | 2.5 s | 0.7 s veil, reflects first projectile at +20% speed; empty veil = 0.8 s exhaustion, −10 Aether |
 | Gravewell | 30 | 0.7 s | 10 s | collapses enemy projectiles within 1 s, pops orbs, interrupts channel, 8 dmg; 1 s open (×1.25 damage taken) |
 | Aurum Orb | 20 | 0.5 s | 1 s | orb for 14 s; `Q` fires Knockback Blast (14 dmg, 15 Poise, shoves a lane, cancels a draw) |
 | Umbra Orb | 20 | 0.5 s | 1 s | orb for 14 s; `E` fires Pull Lance (10 dmg, drags enemy projectiles to another lane) |
 | Eclipse Rend | 15 + 2 orbs | 2.5 s channel | 25 s | 55 dmg + Poise break, 2 s travel, slow lane tracking, not reflectable, annihilates Ward |
-| Piercing Dart | 8 | 0.2 s | 0.6 s | 6 dmg, 0.4 s travel, pierces Ward |
-| Riptide Lash | 14 | 0.35 s | 1.5 s | 7 dmg, Chill 3 s (casting 25% slower) |
-| Mending Light | 24 | 0.6 s | 12 s | +24 Vitality over 2 s, cures Burn |
+| Piercing Dart | 7 | 0.2 s | 0.6 s | 7 dmg, 0.4 s travel, pierces Ward |
+| Riptide Lash | 11 | 0.35 s | 1.5 s | 9 dmg, Chill 3 s (casting 25% slower) |
+| Mending Light | 24 | 0.6 s | 14 s | +16 Vitality over 2 s, cures Burn |
 | Aegis | 20 | 0.3 s | 9 s | 4 s of −40% damage and −50% Poise damage |
-| Moonblade | 16 | 0.4 s | 2 s | 10 dmg, 6 Poise, hits lane ±1 |
-| Starfall | 30 | 0.7 s | 9 s | 3 meteors (9 dmg + short Burn) at 0.5 s, 0.8 s, 1.1 s, one per lane, absorbed by Ward |
-| Twin Fangs | 18 | 0.4 s | 2.5 s | two 6 dmg projectiles in different lanes, 0.6 s and 0.85 s |
+| Moonblade | 14 | 0.4 s | 2 s | 12 dmg, 6 Poise, hits lane ±1 |
+| Starfall | 30 | 0.7 s | 9 s | 3 meteors (12 dmg + short Burn) at 0.5 s, 0.8 s, 1.1 s, one per lane, absorbed by Ward |
+| Twin Fangs | 15 | 0.4 s | 2.5 s | two 8 dmg projectiles in different lanes, 0.6 s and 0.85 s |
 
-Resources: Vitality 100, Aether 100 (+8/s, paused 0.6 s after casting), Poise 40 (break = 2 s stagger, ×1.5 damage, resets to 25). Blink: 8 Aether, 0.15 s, 6 ticks of invulnerability, 1.2 s cooldown.
+Resources: Vitality 100, Aether 100 (+8/s, paused 0.6 s after casting), Poise 50 (break = 2 s stagger, ×1.5 damage, resets to 25). Blink: 8 Aether, 0.15 s, 6 ticks of invulnerability, 1.2 s cooldown.
 
 ## Counter matrix (row beats / pressures column)
 
@@ -59,6 +59,8 @@ Server → client: `seat {seat, code}`, `snap {phase, countdown, round, wins, oa
 The server ignores any spell or tier a client claims: it recognises the stroke itself.
 
 ## Balance evidence
+
+`npm run sim:ablate` plays an Adept that may not cast one spell against a full-kit Adept; `packages/sim/scripts/dmg.ts` attributes damage per source. Findings that shaped the numbers: a Stormfork telegraph of 0.35 s was effectively undodgeable for the AI (and tight for humans), which let it deal over half of all damage, so it is now 0.55 s; Cinder's Burn made it the most Aether-efficient spell, so Burn was trimmed; Mending Light was worth about 8 points of win rate and was reduced; the new spells were raised to roughly 0.8-1.1 damage per Aether. Cinder and Stormfork remain the backbone (as the cheap pressure and the punisher), every new spell now sits within about 5 points of neutral except Dart (slightly strong) and the orbs (slightly weak for the AI).
 
 `npm run sim:balance` (1000 Adept-vs-Adept rounds): no spell above ~40% of casts, seat win rate ≈ 50/50; an Eclipse-only strategy wins 0 of 200 against a basic counter-playing AI. Both are asserted in `packages/sim/test/balance.test.ts`.
 
