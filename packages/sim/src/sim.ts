@@ -20,7 +20,7 @@ function newWizard(): Wizard {
   return {
     vit: bal.vitality, aether: bal.aether, poise: bal.poise, lane: 1, state: 'idle', stateUntil: 0, oath: null,
     windup: null, draw: null, cooldowns: {}, blinkReady: 0, blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0,
-    lastHit: -9999, brokenUntil: 0, openUntil: 0, aegisUntil: 0, heal: null, orbs: { aurum: 0, umbra: 0 }, ward: null, mirror: null, burnUntil: 0,
+    lastHit: -9999, brokenUntil: 0, openUntil: 0, aegisUntil: 0, focusUntil: 0, streak: 0, overcharge: false, heal: null, orbs: { aurum: 0, umbra: 0 }, ward: null, mirror: null, burnUntil: 0,
     burnPhase: 0, chillUntil: 0, lastSpell: null, lastCastTick: -9999, fatigue: 0, recent: [], weaveUntil: 0,
     echoNext: false, casts: 0, stats: { damageDealt: 0, casts: {} },
   };
@@ -30,6 +30,7 @@ export function createDuel(seed = 1, oaths: [Oath | null, Oath | null] = [null, 
   const s: DuelState = {
     tick: 0, seed, rng: seed >>> 0, nextId: 1, w: [newWizard(), newWizard()], projectiles: [], strikes: [], wells: [],
     tide: null, nextTide: T(bal.tide.everySeconds), over: null, roundTicks: T(bal.roundSeconds),
+    hazard: null, nextHazard: T(bal.arena.firstHazard), crystal: null, nextCrystal: T(bal.arena.firstCrystal),
   };
   s.w[0].oath = oaths[0];
   s.w[1].oath = oaths[1];
@@ -86,6 +87,7 @@ export function stepDuel(s: DuelState, cmds: [Cmd[], Cmd[]]): SimEvent[] {
   tickStrikes(ctx);
   tickProjectiles(ctx);
   tickTide(ctx);
+  tickArena(ctx);
   checkOver(ctx);
   return ev;
 }
@@ -208,12 +210,30 @@ function doCast(ctx: Ctx, p: PlayerId, c: Extract<Cmd, { t: 'cast' }>): void {
     w.weaveUntil = s.tick + T(bal.weave.durationSeconds);
     ev.push({ type: 'weave', p });
   }
-  const power =
+  let power =
     bal.tiers[tier].power * Math.max(bal.fatigue.minPower, 1 - bal.fatigue.powerPerStack * stacks) * (s.tick < w.weaveUntil ? bal.weave.damageMult : 1);
+  // skill rewards: an Overcharge from three Perfect draws in a row empowers the next spell
+  if (w.overcharge && !quick) {
+    w.overcharge = false;
+    power *= bal.mechanics.overchargeMult;
+    ev.push({ type: 'combo', p, name: 'OVERCHARGED' });
+  }
+  if (!quick) {
+    if (tier === 'perfect') {
+      if (++w.streak >= bal.mechanics.overchargeStreak) {
+        w.streak = 0;
+        w.overcharge = true;
+        ev.push({ type: 'overcharge', p });
+      }
+    } else {
+      w.streak = 0;
+    }
+  }
   let windSec = bal.spells[spell].windup + bal.tiers[tier].windupAdd;
   if (spell === 'cinder' && w.oath === 'embers') windSec -= bal.oaths.embers.cinderWindupLess;
   let windTicks = Math.max(2, Math.round(windSec * bal.tickRate));
   if (s.tick < w.chillUntil && spell !== 'eclipse') windTicks = Math.round(windTicks * 1.25);
+  if (s.tick < w.focusUntil && spell !== 'eclipse') windTicks = Math.max(2, Math.round(windTicks * bal.mechanics.focusWindupMult));
   // Spamming the same spell, or casting in a frantic burst, makes the charge unstable (chance-based, like a real duel)
   const mf = bal.misfire;
   let chance = stacks >= mf.startStacks ? mf.perStack * (stacks - mf.startStacks + 1) : 0;
@@ -490,6 +510,10 @@ function damage(ctx: Ctx, target: PlayerId, amount: number, poiseDmg: number, ki
   const w = s.w[target];
   if (w.state === 'dead') return 0;
   let dmg = amount;
+  if ((w.state === 'windup' || w.state === 'channeling') && kind !== 'gravewell' && kind !== 'wellspring') {
+    dmg *= bal.mechanics.counterHitMult; // punishing a charge you read
+    ev.push({ type: 'combo', p: src, name: 'COUNTER HIT' });
+  }
   if (w.brokenUntil > s.tick) dmg *= bal.breakDamageMult;
   if (w.openUntil > s.tick) dmg *= bal.spells.gravewell.openDamageMult;
   if (s.tick < w.aegisUntil) {
@@ -526,6 +550,15 @@ function damage(ctx: Ctx, target: PlayerId, amount: number, poiseDmg: number, ki
 
 // ---- storms, wells, projectiles ----------------------------------------------------------------
 
+function perfectDodge(ctx: Ctx, p: PlayerId): void {
+  const { s, ev } = ctx;
+  const w = s.w[p];
+  w.aether = Math.min(bal.aether, w.aether + bal.blink.aether + bal.mechanics.perfectDodgeAether);
+  w.blinkReady = s.tick; // the dodge costs nothing: you may go again immediately
+  w.focusUntil = s.tick + T(bal.mechanics.focusSeconds);
+  ev.push({ type: 'perfectDodge', p });
+}
+
 function tickStrikes(ctx: Ctx): void {
   const { s, ev } = ctx;
   const keep: typeof s.strikes = [];
@@ -539,6 +572,7 @@ function tickStrikes(ctx: Ctx): void {
     const c = bal.spells.storm;
     const stands = ew.lane === st.lane && s.tick >= ew.invulnUntil && ew.state !== 'dead';
     ev.push({ type: 'stormStrike', p: st.owner, lane: st.lane, hit: stands, meteor: st.meteor });
+    if (!stands && ew.state === 'blinking' && ew.blinkFrom === st.lane) perfectDodge(ctx, foe);
     if (!stands) continue;
     if (st.meteor) {
       if (ew.ward) {
@@ -660,6 +694,7 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
   }
   if (s.tick < def.invulnUntil) {
     ev.push({ type: 'dodge', p: defId, id: pr.id });
+    if (def.state === 'blinking' && def.blinkFrom === pr.lane) perfectDodge(ctx, defId);
     return;
   }
   if (def.mirror && !pr.noReflect && pr.kind !== 'eclipse') {
@@ -668,21 +703,32 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
       def.orbs.aurum = 0;
       ev.push({ type: 'orbPop', p: defId, which: 'aurum', reason: 'release' }, { type: 'combo', p: defId, name: 'PRISM RETURN' });
     }
+    const perfectParry = s.tick - def.mirror.start <= bal.mechanics.parryTicks;
     def.mirror.hit = true;
     const att = s.w[pr.owner];
     const back: Projectile = {
       ...pr,
       id: s.nextId++, owner: defId, lane: att.lane, born: s.tick,
       arrive: s.tick + Math.max(3, Math.round((pr.arrive - pr.born) / bal.spells.mirror.returnSpeed)),
-      dmg: pr.dmg * (prism ? bal.spells.mirror.prismMult : 1), pierce: prism, noReflect: true, reflected: true,
+      dmg: pr.dmg * (prism ? bal.spells.mirror.prismMult : 1) * (perfectParry ? bal.mechanics.parryMult : 1), pierce: prism, noReflect: true, reflected: true,
     };
+    if (perfectParry) {
+      def.aether = Math.min(bal.aether, def.aether + bal.mechanics.parryAether);
+      ev.push({ type: 'combo', p: defId, name: 'PERFECT PARRY' });
+    }
     s.projectiles.push(back);
     ev.push({ type: 'reflect', p: defId, prism, id: back.id });
     ev.push({ type: 'projectile', p: defId, id: back.id, kind: back.kind, lane: back.lane, eta: back.arrive - s.tick });
     return;
   }
   const pre = def.state;
-  damage(ctx, defId, pr.dmg, pr.kind === 'eclipse' ? bal.poise : pr.poise, pr.kind, pr.lane, pr.owner);
+  let dealt = pr.dmg;
+  if (pr.kind === 'cinder' && s.tick < def.chillUntil) {
+    dealt *= bal.arena.shatterMult; // a chilled target hit by fire cracks
+    def.chillUntil = 0;
+    ev.push({ type: 'combo', p: pr.owner, name: 'SHATTER' });
+  }
+  damage(ctx, defId, dealt, pr.kind === 'eclipse' ? bal.poise : pr.poise, pr.kind, pr.lane, pr.owner);
   if ((def.state as string) === 'dead') return;
   if (pr.burn) {
     const extra = s.w[pr.owner].oath === 'embers' ? bal.oaths.embers.burnExtra : 0;
@@ -706,6 +752,65 @@ function resolveImpact(ctx: Ctx, pr: Projectile, live: Projectile[]): void {
     }
   }
   void live;
+}
+
+function tickArena(ctx: Ctx): void {
+  const { s, ev } = ctx;
+  const a = bal.arena;
+  // ---- Hollow Rift
+  if (!s.hazard && s.tick >= s.nextHazard) {
+    const lane = Math.floor(rand(s) * 3) as Lane;
+    s.hazard = { lane, warnUntil: s.tick + T(a.hazardWarn), until: s.tick + T(a.hazardWarn) + T(a.hazardSeconds), announced: false };
+    ev.push({ type: 'hazardWarn', lane });
+  }
+  const hz = s.hazard;
+  if (hz) {
+    if (s.tick >= hz.warnUntil) {
+      if (!hz.announced) {
+        hz.announced = true;
+        ev.push({ type: 'hazard', lane: hz.lane });
+      }
+      for (const p of [0, 1] as PlayerId[]) {
+        const w = s.w[p];
+        if (w.state === 'dead' || w.lane !== hz.lane || w.state === 'blinking' || s.tick < w.invulnUntil) continue;
+        let d = a.hazardDps / bal.tickRate;
+        if (s.tick < w.aegisUntil) d *= bal.spells.aegis.damageMult;
+        w.vit = Math.max(0, w.vit - d);
+        if (s.tick % 15 === 0) ev.push({ type: 'hit', p, kind: 'hazard', dmg: a.hazardDps / 2, poise: 0, lane: w.lane });
+        if (w.vit <= 0) w.state = 'dead';
+      }
+    }
+    if (s.tick >= hz.until) {
+      s.hazard = null;
+      s.nextHazard = s.tick + T(a.hazardEvery);
+      ev.push({ type: 'hazardEnd' });
+    }
+  }
+  // ---- Aether crystal
+  if (!s.crystal && s.tick >= s.nextCrystal) {
+    const pool = ([0, 1, 2] as Lane[]).filter((l) => !s.hazard || l !== s.hazard.lane);
+    const lane = pool[Math.floor(rand(s) * pool.length)]!;
+    s.crystal = { lane, until: s.tick + T(a.crystalSeconds) };
+    ev.push({ type: 'crystalSpawn', lane });
+  }
+  const cr = s.crystal;
+  if (cr) {
+    for (const p of [0, 1] as PlayerId[]) {
+      const w = s.w[p];
+      if (w.state === 'dead' || w.state === 'blinking' || w.lane !== cr.lane) continue;
+      w.aether = Math.min(bal.aether, w.aether + a.crystalAether);
+      w.vit = Math.min(bal.vitality, w.vit + a.crystalVit);
+      ev.push({ type: 'crystal', p });
+      s.crystal = null;
+      s.nextCrystal = s.tick + T(a.crystalEvery);
+      break;
+    }
+    if (s.crystal && s.tick >= cr.until) {
+      s.crystal = null;
+      s.nextCrystal = s.tick + T(a.crystalEvery);
+      ev.push({ type: 'crystalGone' });
+    }
+  }
 }
 
 function tickTide(ctx: Ctx): void {

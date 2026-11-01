@@ -103,6 +103,11 @@ export interface Wizard {
   burnUntil: number;
   burnPhase: number;
   aegisUntil: number;
+  /** after a Perfect Dodge: faster windups for a few seconds */
+  focusUntil: number;
+  /** consecutive Perfect-tier casts; three charge an Overcharge */
+  streak: number;
+  overcharge: boolean;
   heal: { until: number; perTick: number } | null;
   chillUntil: number;
   lastSpell: SpellId | null;
@@ -128,6 +133,12 @@ export interface DuelState {
   nextTide: number;
   over: { winner: PlayerId | null; reason: 'ko' | 'timeout' | 'draw' } | null;
   roundTicks: number;
+  /** Hollow Rift: a lane that burns whoever stands in it, announced before it activates */
+  hazard: { lane: Lane; warnUntil: number; until: number; announced: boolean } | null;
+  nextHazard: number;
+  /** Aether crystal: stand in its lane to collect */
+  crystal: { lane: Lane; until: number } | null;
+  nextCrystal: number;
 }
 
 export type SimEvent =
@@ -155,18 +166,26 @@ export type SimEvent =
   | { type: 'eclipseInterrupt'; p: PlayerId }
   | { type: 'blink'; p: PlayerId; from: Lane; to: Lane }
   | { type: 'dodge'; p: PlayerId; id: number }
-  | { type: 'hit'; p: PlayerId; kind: ProjKind | 'storm' | 'meteor' | 'burn' | 'wellspring' | 'gravewell'; dmg: number; poise: number; lane: Lane }
+  | { type: 'hit'; p: PlayerId; kind: ProjKind | 'storm' | 'meteor' | 'hazard' | 'burn' | 'wellspring' | 'gravewell'; dmg: number; poise: number; lane: Lane }
   | { type: 'shove'; p: PlayerId; from: Lane; to: Lane }
   | { type: 'drawCancelled'; p: PlayerId }
   | { type: 'break'; p: PlayerId }
   | { type: 'interrupt'; p: PlayerId }
   | { type: 'stagger'; p: PlayerId; ticks: number }
-  | { type: 'combo'; p: PlayerId; name: 'THUNDERBURN' | 'PRISM RETURN' | 'WELLSPRING' | 'ECLIPSE' }
+  | { type: 'combo'; p: PlayerId; name: 'THUNDERBURN' | 'PRISM RETURN' | 'WELLSPRING' | 'ECLIPSE' | 'SHATTER' | 'PERFECT PARRY' | 'COUNTER HIT' | 'OVERCHARGED' }
   | { type: 'weave'; p: PlayerId }
   | { type: 'tide'; spell: SpellId }
   | { type: 'burn'; p: PlayerId }
   | { type: 'chill'; p: PlayerId }
   | { type: 'heal'; p: PlayerId; amount: number }
   | { type: 'aegis'; p: PlayerId }
+  | { type: 'perfectDodge'; p: PlayerId }
+  | { type: 'overcharge'; p: PlayerId }
+  | { type: 'hazardWarn'; lane: Lane }
+  | { type: 'hazard'; lane: Lane }
+  | { type: 'hazardEnd' }
+  | { type: 'crystalSpawn'; lane: Lane }
+  | { type: 'crystal'; p: PlayerId }
+  | { type: 'crystalGone' }
   | { type: 'oath'; p: PlayerId; oath: Oath }
   | { type: 'over'; winner: PlayerId | null; reason: 'ko' | 'timeout' | 'draw' };

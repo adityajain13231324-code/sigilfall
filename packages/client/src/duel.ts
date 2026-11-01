@@ -136,6 +136,7 @@ export class DuelScene {
     this.world.vfx.clear();
     this.overFired = false;
     this.killcam = null;
+    this.phaseSeen = 1;
     this.active = true;
     this.input.enabled = true;
     this.hud.show(opts.hud !== false);
@@ -155,6 +156,7 @@ export class DuelScene {
     this.world.vfx.clear();
     this.overFired = false;
     this.killcam = null;
+    this.phaseSeen = 1;
     this.clearLoops();
     this.input.enabled = true;
     if (this.driver.match) this.hud.setPips(this.driver.match.wins, this.driver.seat, this.driver.match.round);
@@ -472,6 +474,14 @@ export class DuelScene {
           world.shake(big * 0.35);
         }
         const tip = e.p === me ? this.myTip(this.tmp) : this.enemy.tip(this.tmp);
+        {
+          const bx = this.layout.laneX(s.w[e.p].lane);
+          const bz = this.layout.zOf(e.p);
+          vfx.ring(new THREE.Vector3(bx, 0.1, bz), info.color, 0.5, 4.2, 0.6, 'y');
+          vfx.burst({ pos: new THREE.Vector3(bx, 1.4, bz), color: info.color, count: 40, speed: 3.5, life: 0.6, size: 0.16 });
+          vfx.ring(tip.clone(), info.color, 0.2, 1.8, 0.35, 'z');
+          world.fovKick = Math.max(world.fovKick, e.p === me ? 4 : 2);
+        }
         vfx.burst({ pos: tip.clone(), color: info.color, count: e.spell === 'eclipse' ? 80 : 24, speed: 3, life: 0.5, size: 0.14 });
         if (e.spell === 'eclipse') {
           a.play('eclipseLaunch', { priority: 2 });
@@ -612,6 +622,7 @@ export class DuelScene {
         const col = kindColor[e.kind] ?? 0xffffff;
         const big = Math.min(1, e.dmg / 40);
         vfx.burst({ pos, color: col, count: 30 + Math.round(big * 80), speed: 3 + big * 5, life: 0.7, size: 0.16, gravity: 2 });
+        this.impactFx(e.kind, pos, e.lane, e.p, big);
         vfx.ring(pos, col, 0.3, 1.6 + big * 2, 0.45, 'z');
         a.play(e.kind === 'storm' ? 'hit' : 'impact_' + (e.kind === 'wellspring' || e.kind === 'gravewell' ? 'lance' : e.kind), { priority: 2 });
         this.hitStop(40 + big * 60);
@@ -663,7 +674,10 @@ export class DuelScene {
       case 'interrupt':
         break;
       case 'combo':
-        if (e.name !== 'ECLIPSE' || true) this.hud.callout(e.name + '!', e.name === 'ECLIPSE' ? '#ffb020' : e.name === 'THUNDERBURN' ? '#8ff6ff' : '#cfe0ff');
+        if (e.name !== 'ECLIPSE' || true) this.hud.callout(e.name + '!', e.name === 'ECLIPSE' ? '#ffb020' : e.name === 'THUNDERBURN' ? '#8ff6ff' : e.name === 'SHATTER' ? '#bfeaff' : '#cfe0ff');
+        if (e.name === 'SHATTER') a.play('shatter', { priority: 2 });
+        if (e.name === 'PERFECT PARRY') a.play('parry', { priority: 2 });
+        if (e.name === 'COUNTER HIT') a.play('counterHit', { priority: 2 });
         break;
       case 'heal': {
         const pos = this.bodyPos(e.p, s.w[e.p].lane, 1.4);
@@ -677,6 +691,47 @@ export class DuelScene {
         if (e.p === me) this.hud.note('Aegis: −40% damage', 'good');
         break;
       }
+      case 'hazardWarn':
+        a.play('riftWarn');
+        this.hud.note('The Hollow Rift opens in the ' + ['left', 'center', 'right'][this.me === 0 ? e.lane : 2 - e.lane] + ' lane — move!', 'warn');
+        break;
+      case 'hazard':
+        a.play('riftOpen', { priority: 2 });
+        world.shake(0.25);
+        break;
+      case 'crystalSpawn':
+        a.play('crystalSpawn');
+        vfx.ring(new THREE.Vector3(this.layout.laneX(e.lane), 0.1, 0), 0x4dffc8, 0.3, 3, 0.7, 'y');
+        this.hud.note('An Aether crystal appeared — step onto it', 'good');
+        break;
+      case 'crystal': {
+        a.play('crystal', { priority: 2 });
+        const cp = this.fx.crystalPos() ?? this.bodyPos(e.p, s.w[e.p].lane, 1.5);
+        vfx.burst({ pos: cp, color: 0x4dffc8, count: 60, speed: 4, life: 0.8, size: 0.18 });
+        vfx.ring(this.bodyPos(e.p, s.w[e.p].lane, 0.2), 0x4dffc8, 0.4, 3, 0.6, 'y');
+        this.hud.floatText('+25 Aether', this.bodyPos(e.p, s.w[e.p].lane, 2.4), world.camera, '#4dffc8');
+        break;
+      }
+      case 'perfectDodge': {
+        a.play('perfectDodge', { priority: 2 });
+        const pos = this.bodyPos(e.p, s.w[e.p].lane, 1.4);
+        vfx.ring(pos, 0x9fe8ff, 0.3, 3.2, 0.5, 'z');
+        vfx.burst({ pos, color: 0x9fe8ff, count: 40, speed: 4, life: 0.5, size: 0.14 });
+        if (e.p === me) {
+          this.hud.callout('PERFECT DODGE', '#9fe8ff');
+          this.hud.note('Focus: your next spells charge faster', 'good');
+          this.slowmo(350);
+        } else this.hud.note('Corvane slipped it!', 'foe');
+        break;
+      }
+      case 'overcharge':
+        a.play('overcharge', { priority: 2 });
+        if (e.p === me) {
+          this.hud.callout('OVERCHARGE READY', '#ffd76a');
+          this.hud.note('Your next spell hits 35% harder', 'good');
+          vfx.ring(this.bodyPos(e.p, s.w[e.p].lane, 0.2), 0xffd76a, 0.4, 4.5, 0.7, 'y');
+        }
+        break;
       case 'weave':
         a.play('weave');
         if (e.p === me) this.hud.note('Spellweave!', 'good');
@@ -698,6 +753,70 @@ export class DuelScene {
         break;
     }
     void T;
+  }
+
+  private phaseSeen = 1;
+
+  /** announce the boss growing bolder as its Vitality falls */
+  private bossPhase(fw: Wizard): void {
+    const ph = fw.vit < 33 ? 3 : fw.vit < 66 ? 2 : 1;
+    this.enemy.rage = ph;
+    if (ph > this.phaseSeen && fw.state !== 'dead') {
+      this.phaseSeen = ph;
+      this.hud.callout(ph === 2 ? 'THE MAGISTER GROWS BOLD' : 'THE MAGISTER IS ENRAGED', ph === 2 ? '#ffb070' : '#ff5a4a');
+      this.audio.play('phaseUp', { priority: 2 });
+      this.world.shake(0.5);
+      this.world.chroma(0.6);
+      this.world.vfx.ring(new THREE.Vector3(this.enemy.group.position.x, 0.1, this.enemy.group.position.z), ph === 2 ? 0xffa040 : 0xff3a2a, 0.5, 8, 1.0, 'y');
+    }
+  }
+
+  /** big, readable impact effects per spell family */
+  private impactFx(kind: string, pos: THREE.Vector3, lane: number, target: PlayerId, big: number): void {
+    const vfx = this.world.vfx;
+    const floor = new THREE.Vector3(pos.x, 0.1, pos.z);
+    const up = new THREE.Vector3(0, 1, 0);
+    switch (kind) {
+      case 'cinder':
+      case 'fang':
+      case 'meteor':
+        vfx.burst({ pos: floor, color: 0xff7a2a, count: 50 + big * 80, speed: 3 + big * 4, life: 0.9, size: 0.26, gravity: -3, dir: up, spread: 0.7 });
+        vfx.burst({ pos: floor, color: 0xffe0a0, count: 20, speed: 5, life: 0.35, size: 0.18, gravity: 4 });
+        vfx.ring(floor, 0xff9a3a, 0.3, 2.6 + big * 2, 0.55, 'y');
+        this.fx.scorch(floor, 0xff6a20, 1.1 + big);
+        if (kind === 'meteor') this.world.flash.color.setHex(0xff9a40), (this.world.flash.intensity = 50);
+        break;
+      case 'storm':
+        vfx.burst({ pos: floor, color: 0xdffcff, count: 70, speed: 6, life: 0.4, size: 0.14, gravity: 6 });
+        vfx.ring(floor, 0x8ff6ff, 0.2, 4, 0.4, 'y');
+        vfx.ring(floor, 0xffffff, 0.1, 2.2, 0.25, 'y');
+        this.fx.scorch(floor, 0x6fe8ff, 1.2, 2.5);
+        break;
+      case 'riptide':
+        vfx.burst({ pos, color: 0x3fd0c0, count: 70, speed: 4, life: 0.8, size: 0.2, gravity: 5 });
+        vfx.ring(floor, 0x7ffff0, 0.2, 3.2, 0.6, 'y');
+        break;
+      case 'crescent':
+        vfx.burst({ pos, color: 0xf2e6a0, count: 60, speed: 6, life: 0.5, size: 0.18 });
+        vfx.ring(pos, 0xfff2b0, 0.4, 3.4, 0.4, 'z');
+        vfx.ring(pos, 0xfff2b0, 0.2, 2.2, 0.3, 'x');
+        break;
+      case 'dart':
+        vfx.burst({ pos, color: 0xdffcff, count: 30, speed: 7, life: 0.3, size: 0.12 });
+        vfx.ring(pos, 0xaaf6ff, 0.1, 1.4, 0.25, 'z');
+        break;
+      case 'blast':
+      case 'lance':
+      case 'shard':
+        vfx.burst({ pos, color: kind === 'blast' ? 0xffcf4a : kind === 'lance' ? 0xa36bff : 0xbfe6ff, count: 55, speed: 5, life: 0.6, size: 0.18, gravity: 2 });
+        vfx.ring(pos, kind === 'blast' ? 0xffcf4a : 0xa36bff, 0.2, 2.6, 0.45, 'z');
+        break;
+      default:
+        break;
+    }
+    this.world.fovKick = Math.max(this.world.fovKick, 2 + big * 7);
+    void lane;
+    void target;
   }
 
   private onOver(winner: PlayerId | null, reason: string): void {
@@ -797,6 +916,9 @@ export class DuelScene {
     this.fx.update(cosmeticDt, s, viewTick);
     this.fx.charge(me, mw.windup, s.tick, this.myTip(this.tmp).clone(), cosmeticDt);
     this.fx.charge(foe, fw.windup, s.tick, this.enemy.tip(this.tmp).clone(), cosmeticDt);
+    this.fx.circle(me, mw.windup, s.tick, new THREE.Vector3(x, 0.07, this.layout.zOf(me)), cosmeticDt);
+    this.fx.circle(foe, fw.windup, s.tick, new THREE.Vector3(this.wizX(foe, fw, viewTick), 0.07, this.layout.zOf(foe)), cosmeticDt);
+    this.bossPhase(fw);
 
     // looping audio: incoming projectiles rise in pitch as they approach (audio telegraph)
     const seen = new Set<number>();
@@ -895,7 +1017,7 @@ const idleWizard = ((): Wizard => {
   return {
     vit: 100, aether: 100, poise: 40, lane: 1, state: 'idle', stateUntil: 0, oath: null, windup: null, draw: null, cooldowns: {}, blinkReady: 0,
     blinkFrom: 1, blinkTo: 1, invulnUntil: 0, regenFrom: 0, lastHit: 0, brokenUntil: 0, openUntil: 0, orbs: { aurum: 0, umbra: 0 }, ward: null,
-    mirror: null, burnUntil: 0, burnPhase: 0, aegisUntil: 0, heal: null, chillUntil: 0, lastSpell: null, lastCastTick: 0, fatigue: 0, recent: [], weaveUntil: 0, echoNext: false,
+    mirror: null, burnUntil: 0, burnPhase: 0, aegisUntil: 0, focusUntil: 0, streak: 0, overcharge: false, heal: null, chillUntil: 0, lastSpell: null, lastCastTick: 0, fatigue: 0, recent: [], weaveUntil: 0, echoNext: false,
     casts: 0, stats: { damageDealt: 0, casts: {} },
   };
 })();

@@ -64,6 +64,21 @@ The server ignores any spell or tier a client claims: it recognises the stroke i
 
 `npm run sim:balance` (1000 Adept-vs-Adept rounds): no spell above ~40% of casts, seat win rate ≈ 50/50; an Eclipse-only strategy wins 0 of 200 against a basic counter-playing AI. Both are asserted in `packages/sim/test/balance.test.ts`.
 
+## Arena and skill mechanics
+
+| Mechanic | Rule |
+|---|---|
+| Hollow Rift | first at 14 s, then every ~20 s: a random lane is marked for 1.4 s, then deals 5 dmg/s for 5 s to anyone standing in it (Aegis reduces it; a Blink in progress is safe) |
+| Aether crystal | first at 7 s, then every ~12 s: appears in a lane (never the Rift's) for 8 s; the first wizard to stand in the lane gets +25 Aether and +6 Vitality |
+| Perfect Dodge | a Blink in progress when an attack aimed at the lane you left arrives: refunds the Blink cost, +14 Aether, Blink cooldown reset, Focus for 3 s (windups ×0.7) |
+| Perfect Parry | the Mirrorveil catches a projectile within its first 7 ticks: reflection ×1.4, +10 Aether |
+| Overcharge | 3 consecutive Perfect-tier draws (any non-Perfect cast resets): the next drawn spell ×1.35 |
+| Counter Hit | damage to a wizard in Windup or Channeling ×1.2 |
+| Shatter | Cinder on a Chilled target ×1.3, consumes the Chill |
+| Boss phases | the AI computes a phase from Vitality (<66, <33): think time ×0.75 / ×0.55, +8% dodge skill per phase, weights toward Starfall, Moonblade and Eclipse |
+
+All of it lives in the deterministic sim (`arena`, `mechanics` blocks in `balance.json`), so online duels get it too.
+
 ## Difficulty and pacing
 
 Projectiles fly 30% slower than their listed travel times (`projectileSlow` in `balance.json`; Eclipse is unchanged), so spells read clearly and are easier to dodge. The third-person camera sits high and to the side so both wizards, the lanes and every projectile are on screen at once.

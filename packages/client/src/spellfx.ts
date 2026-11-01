@@ -151,7 +151,7 @@ export class SpellFx {
     g.add(out, core);
     if (pr.kind !== 'eclipse') g.add(makeGlow(c, Math.max(0.5, r) * 5.5, 0.75));
     let light: THREE.PointLight | undefined;
-    if (pr.kind === 'cinder' || pr.kind === 'eclipse') {
+    {
       light = new THREE.PointLight(c, pr.kind === 'eclipse' ? 3 : 2.2, 9, 1.8);
       g.add(light);
     }
@@ -191,10 +191,14 @@ export class SpellFx {
       // emit trail
       if (!settings.clarity || pr.kind === 'eclipse') {
         const col = pr.reflected ? 0xdfe8f5 : COL[pr.kind];
-        if (pr.kind === 'cinder') this.vfx.burst({ pos, color: col, count: 3, speed: 0.6, life: 0.45, size: 0.14, gravity: -0.6, dir: new THREE.Vector3(0, 0, -lay.fwd(pr.owner)), spread: 0.8 });
+        if (pr.kind === 'cinder') {
+          this.vfx.burst({ pos, color: col, count: 7, speed: 0.9, life: 0.7, size: 0.22, gravity: -0.8, dir: new THREE.Vector3(0, 0, -lay.fwd(pr.owner)), spread: 0.9 });
+          this.vfx.burst({ pos, color: 0xffe2a0, count: 2, speed: 0.3, life: 0.25, size: 0.12 });
+        }
         else if (pr.kind === 'eclipse') this.vfx.burst({ pos, color: Math.random() < 0.5 ? 0xffb020 : 0xa36bff, count: 5, speed: 1.4, life: 0.8, size: 0.18, inward: true, radius: 1.8 });
-        else if (pr.kind === 'lance' || pr.kind === 'dart' || pr.kind === 'crescent') this.vfx.burst({ pos, color: col, count: 2, speed: 0.5, life: 0.4, size: 0.1 });
-        else if (pr.kind === 'riptide') this.vfx.burst({ pos, color: col, count: 3, speed: 0.9, life: 0.5, size: 0.1, gravity: 1.5 });
+        else if (pr.kind === 'lance' || pr.kind === 'dart' || pr.kind === 'crescent') this.vfx.burst({ pos, color: col, count: pr.kind === 'crescent' ? 8 : 4, speed: 0.6, life: 0.55, size: pr.kind === 'crescent' ? 0.2 : 0.12 });
+        else if (pr.kind === 'riptide') this.vfx.burst({ pos, color: col, count: 6, speed: 1.2, life: 0.7, size: 0.15, gravity: 2 });
+        else if (pr.kind === 'fang') this.vfx.burst({ pos, color: col, count: 4, speed: 0.8, life: 0.5, size: 0.14, gravity: -0.5 });
         else this.vfx.burst({ pos, color: col, count: 1, speed: 0.4, life: 0.4, size: 0.1 });
       }
       if (pr.kind === 'eclipse') {
@@ -227,6 +231,7 @@ export class SpellFx {
     }
 
     // storm marks
+    this.syncArena(s, dt);
     const seenS = new Set<number>();
     for (const st of s.strikes) {
       seenS.add(st.id);
@@ -298,6 +303,141 @@ export class SpellFx {
         this.wells.delete(id);
       }
     }
+  }
+
+  private circles: Record<number, { g: THREE.Group; ring: THREE.Mesh; hex: THREE.Mesh; tri: THREE.Mesh; beam: THREE.Mesh } | null> = { 0: null, 1: null };
+  private decals: { m: THREE.Mesh; life: number }[] = [];
+  private hazardMesh: THREE.Mesh | null = null;
+  private crystalG: THREE.Group | null = null;
+
+  /** a glowing rune circle on the floor under a caster that grows with the charge, with a light column */
+  circle(p: PlayerId, wu: Windup | null, tick: number, foot: THREE.Vector3, dt: number): void {
+    let c = this.circles[p];
+    if (!wu) {
+      if (c) c.g.visible = false;
+      return;
+    }
+    if (!c) {
+      const mat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 64), mat());
+      const hex = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.65, 6), mat());
+      const tri = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.67, 3), mat());
+      for (const m of [ring, hex, tri]) m.rotation.x = -Math.PI / 2;
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 7, 28, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      beam.position.y = 3.5;
+      g.add(ring, hex, tri, beam);
+      this.group.add(g);
+      c = { g, ring, hex, tri, beam };
+      this.circles[p] = c;
+    }
+    const info = SPELL_INFO[wu.spell];
+    const prog = THREE.MathUtils.clamp((tick - wu.start) / Math.max(1, wu.end - wu.start), 0, 1);
+    const big = wu.spell === 'eclipse' ? 2.4 : wu.spell === 'starfall' || wu.spell === 'gravewell' ? 1.6 : 1.1;
+    c.g.visible = true;
+    c.g.position.copy(foot);
+    c.g.scale.setScalar((0.5 + prog * 1.1) * big * (wu.misfire ? 1 + Math.sin(this.t * 55) * 0.08 : 1));
+    c.hex.rotation.z += dt * 1.6;
+    c.tri.rotation.z -= dt * 2.4;
+    for (const m of [c.ring, c.hex, c.tri]) (m.material as THREE.MeshBasicMaterial).color.setHex(wu.misfire ? 0xff3a2a : info.color);
+    const bm = c.beam.material as THREE.MeshBasicMaterial;
+    bm.color.setHex(wu.misfire ? 0xff3a2a : info.color);
+    bm.opacity = 0.05 + prog * prog * 0.32;
+    c.beam.scale.set(1, 0.2 + prog * 0.8, 1);
+    c.beam.position.y = 3.5 * (0.2 + prog * 0.8);
+    if (!settings.clarity && Math.random() < dt * 50) this.vfx.burst({ pos: foot.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, 0.1, (Math.random() - 0.5) * 2)), color: wu.misfire ? 0xff3a2a : info.color, count: 1, speed: 1.2, life: 0.9, size: 0.12, gravity: -2.5, drag: 0.6 });
+  }
+
+  /** burnt/frozen mark left on the floor that fades */
+  scorch(pos: THREE.Vector3, color: number, size = 1.2, life = 4): void {
+    const m = new THREE.Mesh(new THREE.RingGeometry(size * 0.25, size, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const core = new THREE.Mesh(new THREE.CircleGeometry(size * 0.9, 24), new THREE.MeshBasicMaterial({ color: 0x050308, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    m.add(core);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(pos.x, 0.045 + Math.random() * 0.01, pos.z);
+    m.userData.life = life;
+    m.userData.max = life;
+    this.group.add(m);
+    this.decals.push({ m, life });
+    if (this.decals.length > 14) {
+      const old = this.decals.shift()!;
+      this.group.remove(old.m);
+    }
+  }
+
+  private syncArena(s: DuelState, dt: number): void {
+    const lay = this.layout;
+    const hz = s.hazard;
+    if (hz) {
+      if (!this.hazardMesh) {
+        this.hazardMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 15), new THREE.MeshBasicMaterial({ color: 0xb04bff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        this.hazardMesh.rotation.x = -Math.PI / 2;
+        this.hazardMesh.position.y = 0.08;
+        this.hazardMesh.renderOrder = 4;
+        this.group.add(this.hazardMesh);
+      }
+      const m = this.hazardMesh;
+      m.visible = true;
+      m.position.x = lay.laneX(hz.lane);
+      const active = s.tick >= hz.warnUntil;
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.color.setHex(active ? 0xd04bff : 0xffd24a);
+      mat.opacity = active ? 0.42 + Math.sin(this.t * 14) * 0.14 : 0.1 + (Math.sin(this.t * 22) > 0 ? 0.28 : 0);
+      if (active && !settings.clarity) {
+        this.vfx.burst({ pos: new THREE.Vector3(lay.laneX(hz.lane) + (Math.random() - 0.5) * 1.8, 0.1, (Math.random() - 0.5) * 12), color: 0xc060ff, count: 3, speed: 1.4, life: 1.0, size: 0.16, gravity: -3.5, drag: 0.5 });
+      }
+    } else if (this.hazardMesh) {
+      this.hazardMesh.visible = false;
+    }
+    const cr = s.crystal;
+    if (cr) {
+      if (!this.crystalG) {
+        const g = new THREE.Group();
+        g.add(
+          new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), new THREE.MeshBasicMaterial({ color: 0xbfffee })),
+          new THREE.Mesh(new THREE.OctahedronGeometry(0.62, 0), new THREE.MeshBasicMaterial({ color: 0x4dffc8, wireframe: true, transparent: true, opacity: 0.8 })),
+          makeGlow(0x4dffc8, 3.2, 0.7),
+        );
+        g.children[0]!.scale.y = 1.6;
+        g.children[1]!.scale.y = 1.6;
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 0.95, 32), new THREE.MeshBasicMaterial({ color: 0x4dffc8, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2;
+        ring.name = 'ring';
+        this.group.add(g, ring);
+        g.userData.ring = ring;
+        this.crystalG = g;
+      }
+      const g = this.crystalG;
+      g.visible = true;
+      const ring = g.userData.ring as THREE.Mesh;
+      ring.visible = true;
+      g.position.set(lay.laneX(cr.lane), 1.5 + Math.sin(this.t * 2.5) * 0.18, 0);
+      ring.position.set(lay.laneX(cr.lane), 0.09, 0);
+      ring.scale.setScalar(1 + Math.sin(this.t * 4) * 0.08);
+      g.rotation.y += dt * 1.8;
+      const left = cr.until - s.tick;
+      const blink = left < 60 && Math.sin(this.t * 18) > 0;
+      g.visible = !blink;
+      if (!settings.clarity && Math.random() < dt * 14) this.vfx.burst({ pos: g.position.clone(), color: 0x4dffc8, count: 1, speed: 0.6, life: 0.8, size: 0.1, gravity: -1 });
+    } else if (this.crystalG) {
+      this.crystalG.visible = false;
+      (this.crystalG.userData.ring as THREE.Mesh).visible = false;
+    }
+    for (let i = this.decals.length - 1; i >= 0; i--) {
+      const d = this.decals[i]!;
+      d.life -= dt;
+      const f = Math.max(0, d.life / d.m.userData.max);
+      ((d.m.material) as THREE.MeshBasicMaterial).opacity = 0.55 * f;
+      ((d.m.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.55 * f;
+      if (d.life <= 0) {
+        this.group.remove(d.m);
+        this.decals.splice(i, 1);
+      }
+    }
+  }
+
+  crystalPos(): THREE.Vector3 | null {
+    return this.crystalG && this.crystalG.visible ? this.crystalG.position.clone() : null;
   }
 
   /** the visible charge-up: an orb of the spell's colour condenses at the wand tip before it is released */

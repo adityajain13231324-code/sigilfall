@@ -55,6 +55,16 @@ The camera is third person by default (Settings → Camera for first person). Fi
 
 Combos: **Thunderburn**, **Prism Return**, **Wellspring**. Full table, counters and rationale: [docs/DESIGN.md](docs/DESIGN.md).
 
+**Skill and variety.** Fights are not just trading bolts:
+
+- **Hollow Rift**: every ~20 s a lane is marked, then burns anyone standing in it for 5 s. Move.
+- **Aether crystals**: step onto the crystal that appears to gain Aether and Vitality; the boss goes for them too.
+- **Perfect Dodge**: Blink at the last moment (as the attack lands) to refund the Blink, gain Aether and a few seconds of **Focus** (faster casting).
+- **Perfect Parry**: raise Mirrorveil just as the bolt arrives for +40% on the reflection and an Aether refund.
+- **Overcharge**: three Perfect-tier draws in a row make your next spell 35% stronger. Careful drawing is rewarded.
+- **Counter Hit** (+20%) for striking a wizard mid-charge, **Shatter** (+30%) for fire on a Chilled target, plus Thunderburn, Prism Return and Wellspring.
+- **The boss changes**: at 66% and 33% Vitality Corvane grows bolder (faster, better dodging, Starfall, Eclipse) and his eyes and halo burn hotter.
+
 Spam is deliberately unreliable: repeating a spell raises its cost, lowers its power and gives a growing chance that the charge **misfires**; frantic bursts add more risk. Mix your spells (Spellweave) instead.
 
 ## Architecture

@@ -49,6 +49,7 @@ export class Hud {
       <div class="roundbox"><div class="pips" id="h-pips"></div><div class="clock" id="h-clock">2:00</div><div class="tide" id="h-tide"></div></div>
       ${bracer('left', 'VITALITY', '#ff6f7f')}
       ${bracer('right', 'AETHER', '#6fc2ff')}
+      <div class="streak" id="h-streak"><b></b><b></b><b></b></div>
       <div class="orbslots"><button id="h-aurum" class="orb aurum" aria-label="Release Aurum orb (Q)"><b>●</b><i>Q</i></button><button id="h-umbra" class="orb umbra" aria-label="Release Umbra orb (E)"><b>○</b><i>E</i></button></div>
       <div class="lanes" id="h-lanes"><div class="lane"></div><div class="lane"></div><div class="lane"></div></div>
       <div class="statusrow" id="h-status"></div>
@@ -56,7 +57,7 @@ export class Hud {
       <div class="blinkpad"><button id="h-bl" aria-label="Blink left">◀</button><button id="h-br" aria-label="Blink right">▶</button></div>
       <div class="dmgfloat" id="h-float"></div>
       <div class="hurt" id="h-hurt"></div><div class="flashfx" id="h-flash"></div>`;
-    for (const id of ['h-name', 'h-eorbs', 'h-evit', 'h-epoise', 'h-efx', 'h-pips', 'h-clock', 'h-tide', 'h-aurum', 'h-umbra', 'h-lanes', 'h-status', 'h-ping', 'h-float', 'h-hurt', 'h-flash', 'h-bl', 'h-br']) {
+    for (const id of ['h-name', 'h-eorbs', 'h-evit', 'h-epoise', 'h-efx', 'h-pips', 'h-clock', 'h-tide', 'h-aurum', 'h-umbra', 'h-lanes', 'h-status', 'h-ping', 'h-float', 'h-hurt', 'h-flash', 'h-bl', 'h-br', 'h-streak']) {
       this.els[id] = root.querySelector('#' + id) as HTMLElement;
     }
     this.els.vit = root.querySelector('.bracer.left') as HTMLElement;
@@ -162,6 +163,8 @@ export class Hud {
     };
     setArc(this.els.vit!, me.vit / B.vitality, String(Math.ceil(me.vit)));
     setArc(this.els.aeth!, me.aether / B.aether, String(Math.floor(me.aether)));
+    this.els['h-streak']!.querySelectorAll('b').forEach((b, i) => b.classList.toggle('on', me.overcharge || i < me.streak));
+    this.els['h-streak']!.classList.toggle('full', me.overcharge);
     this.els.vit!.classList.toggle('low', me.vit < 30);
     this.els.aeth!.classList.toggle('low', me.aether < 20);
     // fatigue cracks + spellweave glow
@@ -196,6 +199,8 @@ export class Hud {
     if (s.tick < me.chillUntil) status.push('<span style="color:#9fd8ff">CHILLED</span>');
     if (me.brokenUntil > s.tick) status.push('<span style="color:#ff6f7f">POISE BROKEN</span>');
     if (s.tick < me.weaveUntil) status.push('<span style="color:#8fffb0">SPELLWEAVE</span>');
+    if (me.overcharge) status.push('<span style="color:#ffd76a">OVERCHARGED</span>');
+    if (s.tick < me.focusUntil) status.push('<span style="color:#9fe8ff">FOCUS</span>');
     if (s.tick < me.aegisUntil) status.push('<span style="color:#ffe08a">AEGIS</span>');
     if (me.heal) status.push('<span style="color:#7dffb0">MENDING</span>');
     if (stacks > 0) status.push(`<span style="color:#ffb86f">FATIGUE ×${stacks}</span>`);

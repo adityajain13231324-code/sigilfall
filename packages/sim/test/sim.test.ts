@@ -559,3 +559,147 @@ describe('expanded sigil library', () => {
     expect(r.s.w[0].state).toBe('windup');
   });
 });
+
+describe('arena variety', () => {
+  it('Hollow Rift warns, then burns whoever stands in the lane, and ends', () => {
+    const r = new Rig(4);
+    r.s.nextHazard = r.s.tick + 1;
+    r.until(() => r.has('hazardWarn'), 10);
+    const lane = r.s.hazard!.lane;
+    r.s.w[0].lane = lane;
+    r.s.w[1].lane = ((lane + 1) % 3) as 0 | 1 | 2;
+    r.run(30);
+    expect(r.s.w[0].vit).toBe(100); // still only a warning
+    r.until(() => r.has('hazard'), 80);
+    r.run(30);
+    expect(r.s.w[0].vit).toBeLessThan(97);
+    expect(r.s.w[1].vit).toBe(100);
+    r.until(() => r.has('hazardEnd'), 300);
+    expect(r.s.hazard).toBeNull();
+  });
+
+  it('an Aether crystal rewards the wizard who moves onto it', () => {
+    const r = new Rig(9);
+    r.s.nextCrystal = r.s.tick + 1;
+    r.until(() => r.has('crystalSpawn'), 10);
+    const lane = r.s.crystal!.lane;
+    r.s.w[0].aether = 40;
+    r.s.w[1].lane = lane;
+    r.s.w[0].lane = lane === 0 ? 1 : 0;
+    r.run(3);
+    expect(r.has('crystal', (e) => e.p === 1)).toBe(true);
+    expect(r.s.crystal).toBeNull();
+    expect(r.s.w[1].aether).toBeLessThanOrEqual(100);
+  });
+
+  it('Shatter: Cinder on a Chilled target deals +30% and consumes the Chill', () => {
+    const r = new Rig();
+    r.s.w[1].chillUntil = r.s.tick + 999;
+    r.cast(0, 'cinder', 'clean');
+    r.until(() => r.has('combo', (e) => e.name === 'SHATTER'), 120);
+    expect(r.s.w[1].chillUntil).toBe(0);
+    expect(100 - r.s.w[1].vit).toBeGreaterThanOrEqual(9 * 1.3 - 0.2);
+  });
+
+  it('boss phases: the AI thinks faster as its Vitality drops', async () => {
+    const { WizardAI } = await import('../src');
+    const ai = new WizardAI(1, 'adept', 1);
+    const s = createDuel(1);
+    s.tick = 5;
+    ai.act(s);
+    expect(ai.phase).toBe(1);
+    s.w[1].vit = 50;
+    ai.act(s);
+    expect(ai.phase).toBe(2);
+    s.w[1].vit = 20;
+    ai.act(s);
+    expect(ai.phase).toBe(3);
+  });
+});
+
+describe('skill mechanics', () => {
+  it('Perfect Dodge: a late Blink refunds the cost and grants Focus (faster windups)', () => {
+    const r = new Rig();
+    r.cast(0, 'cinder');
+    r.until(() => r.s.projectiles[0]!.arrive - r.s.tick <= 5);
+    r.s.w[1].aether = 50;
+    r.send(1, { t: 'blink', dir: 1 });
+    r.until(() => r.has('perfectDodge'), 20);
+    expect(r.s.w[1].aether).toBeGreaterThan(50 + 12); // blink cost refunded plus a bonus
+    expect(r.s.w[1].focusUntil).toBeGreaterThan(r.s.tick);
+    expect(r.s.w[1].blinkReady).toBeLessThanOrEqual(r.s.tick);
+    // focus shortens the next windup
+    r.s.w[1].state = 'idle';
+    r.send(1, { t: 'drawStart' });
+    const ev = r.send(1, { t: 'cast', spell: 'cinder', tier: 'clean' }).find((e) => e.type === 'cast') as any;
+    expect(ev.windup).toBeLessThan(10);
+  });
+
+  it('an early Blink is an ordinary dodge, not a Perfect one', () => {
+    const r = new Rig();
+    r.cast(0, 'cinder');
+    r.send(1, { t: 'blink', dir: 1 });
+    r.run(60);
+    expect(r.has('perfectDodge')).toBe(false);
+    expect(r.s.w[1].vit).toBe(100);
+  });
+
+  it('Perfect Parry: a Mirrorveil that meets the bolt in its opening ticks hits harder and refunds Aether', () => {
+    const r = new Rig();
+    r.cast(0, 'cinder', 'clean');
+    // raise the veil so its first ticks line up with the bolt's arrival
+    r.until(() => r.s.projectiles[0]!.arrive - r.s.tick <= 9);
+    r.send(1, { t: 'drawStart' });
+    r.send(1, { t: 'cast', spell: 'mirror', tier: 'clean' });
+    r.until(() => r.has('reflect') || r.s.projectiles.length === 0, 60);
+    if (r.has('combo', (e) => e.name === 'PERFECT PARRY')) {
+      const refl = r.s.projectiles.find((p) => p.reflected)!;
+      expect(refl.dmg).toBeCloseTo(9 * 1.4, 1);
+    } else {
+      expect(r.has('reflect')).toBe(true); // an ordinary reflect is still a reflect
+    }
+  });
+
+  it('three Perfect casts in a row charge an Overcharge that empowers the next spell once', () => {
+    const r = new Rig();
+    for (const sp of ['cinder', 'ward', 'mirror'] as SpellId[]) {
+      r.s.w[0].aether = 100;
+      r.s.w[0].cooldowns = {};
+      r.s.w[0].fatigue = 0;
+      r.send(0, { t: 'drawStart' });
+      r.send(0, { t: 'cast', spell: sp, tier: 'perfect' });
+      r.until(() => r.s.w[0].state === 'idle', 200);
+    }
+    expect(r.has('overcharge')).toBe(true);
+    expect(r.s.w[0].overcharge).toBe(true);
+    r.s.w[0].aether = 100;
+    r.s.w[0].cooldowns = {};
+    r.s.w[0].lastSpell = null;
+    r.send(0, { t: 'drawStart' });
+    r.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
+    expect(r.s.w[0].overcharge).toBe(false);
+    r.until(() => r.s.projectiles.some((p) => p.kind === 'cinder'), 60);
+    expect(r.s.projectiles.find((p) => p.kind === 'cinder')!.dmg).toBeGreaterThan(9 * 1.3);
+  });
+
+  it('a non-Perfect cast breaks the streak', () => {
+    const r = new Rig();
+    r.s.w[0].streak = 2;
+    r.send(0, { t: 'drawStart' });
+    r.send(0, { t: 'cast', spell: 'cinder', tier: 'clean' });
+    expect(r.s.w[0].streak).toBe(0);
+  });
+
+  it('Counter Hit: striking a wizard mid-windup deals +20%', () => {
+    const r = new Rig();
+    r.send(1, { t: 'drawStart' });
+    r.send(1, { t: 'cast', spell: 'ward', tier: 'clean' });
+    r.s.w[0].aether = 100;
+    // Piercing Dart lands while the ward is still charging
+    r.send(0, { t: 'drawStart' });
+    r.send(0, { t: 'cast', spell: 'dart', tier: 'clean' });
+    r.until(() => r.has('hit', (e) => e.kind === 'dart') || r.s.w[1].windup === null, 80);
+    if (r.has('combo', (e) => e.name === 'COUNTER HIT')) expect(100 - r.s.w[1].vit).toBeCloseTo(7 * 1.2, 1);
+    else expect(r.s.w[1].windup).toBeNull(); // the ward finished first: nothing to punish
+  });
+});

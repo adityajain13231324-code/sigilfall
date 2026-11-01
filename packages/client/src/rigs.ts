@@ -121,6 +121,8 @@ export class EnemyRig {
   private tipGlow: THREE.Sprite;
   private cape: THREE.Mesh;
   private taunt = 0;
+  /** boss phase 1-3: later phases burn hotter */
+  rage = 1;
   private nextTaunt = 7;
 
   constructor(private vfx: ParticleVfx, private pal: Palette = CORVANE) {
@@ -315,7 +317,7 @@ export class EnemyRig {
     this.body.rotation.x = -p.stagger * 0.35 - p.flinch * 0.22 - p.dead * 1.3 + p.thrust * 0.12;
     this.body.rotation.z = Math.sin(this.t * 60) * 0.03 * p.shudder + p.flinch * 0.1;
     this.body.position.z = -p.flinch * 0.25 + p.thrust * 0.18;
-    this.halo.children.forEach((c) => { c.rotation.z += c.userData.sp * dt; });
+    this.halo.children.forEach((c) => { c.rotation.z += c.userData.sp * dt * (1 + (this.rage - 1) * 1.2); });
     this.fragments.forEach((f, i) => {
       const a = f.userData.a + this.t * (0.7 + (i % 2) * 0.3);
       f.position.set(Math.cos(a) * 1.0, f.userData.h + Math.sin(this.t * 2 + i) * 0.08, Math.sin(a) * 1.0);
@@ -336,7 +338,7 @@ export class EnemyRig {
     this.armR.rotation.z = -0.1 - flourish * 0.5;
     this.armL.rotation.x = -0.1 - p.wind * 1.2 + Math.sin(this.t * 1.3 + 1) * 0.03;
     this.armL.rotation.z = 0.1 + p.wind * 0.35;
-    this.eyeMat.color.setHex(w.state === 'dead' ? 0x333333 : p.wind > 0.5 ? 0xffb347 : this.pal.eye);
+    this.eyeMat.color.setHex(w.state === 'dead' ? 0x333333 : p.wind > 0.5 ? 0xffb347 : this.rage >= 3 ? 0xff3a2a : this.rage === 2 ? 0xffa040 : this.pal.eye);
 
     // orbs
     this.orbA.group.visible = holds.aurum;

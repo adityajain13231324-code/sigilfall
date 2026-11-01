@@ -58,6 +58,10 @@ body.reduced *, body.reduced *::before { animation: none !important; transition-
 .bracer[data-cracks='2'] .cracks { opacity: 0.5; }
 .bracer[data-cracks='3'] .cracks { opacity: 0.8; }
 
+.streak { position: absolute; bottom: calc(132px + env(safe-area-inset-bottom)); right: 40px; display: flex; gap: 6px; transform: scale(var(--ui)); transform-origin: bottom right; }
+.streak b { width: 11px; height: 11px; transform: rotate(45deg); border: 1px solid rgba(255, 215, 106, 0.5); background: rgba(0, 0, 0, 0.4); }
+.streak b.on { background: #ffd76a; box-shadow: 0 0 10px #ffd76a; }
+.streak.full b { animation: blinkbar 0.3s infinite alternate; }
 .orbslots { position: absolute; bottom: calc(138px + env(safe-area-inset-bottom)); left: 18px; display: flex; gap: 10px; transform: scale(var(--ui)); transform-origin: bottom left; }
 .orb { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); color: var(--dim); display: grid; place-content: center; position: relative; cursor: pointer; opacity: 0.45; }
 .orb b { font-size: 20px; line-height: 1; }

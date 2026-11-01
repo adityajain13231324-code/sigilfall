@@ -54,6 +54,8 @@ export class WizardAI implements Bot {
   private nextThink = 0;
   private p: Profile;
   private lastOffense: SpellId | null = null;
+  /** boss phase 1-3, from remaining Vitality: later phases think faster and dodge better */
+  phase = 1;
   /** spells this AI refuses to cast (used by balance experiments) */
   banned = new Set<SpellId>();
 
@@ -71,6 +73,10 @@ export class WizardAI implements Bot {
         if (e.spell === 'mirror') this.foeMirrorReady = s.tick + T(B.spells.mirror.cooldown);
       }
     }
+  }
+
+  private get bskill(): number {
+    return Math.min(0.97, this.p.blinkSkill + (this.phase - 1) * 0.08);
   }
 
   private reactDelay(): number {
@@ -106,6 +112,7 @@ export class WizardAI implements Bot {
       cmds.push({ t: 'oath', oath: (['embers', 'stillness', 'echoes'] as const)[Math.floor(this.rng() * 3)]! });
     }
     if (w.state === 'dead' || s.over) return cmds;
+    this.phase = w.vit < 33 ? 3 : w.vit < 66 ? 2 : 1;
 
     // execute a drawing plan
     if (this.plan) {
@@ -124,7 +131,7 @@ export class WizardAI implements Bot {
         }
         // imminent danger while drawing: blink out (cancels the draw)
         const danger = this.imminentDanger(s);
-        if (danger && this.rng() < this.p.blinkSkill) {
+        if (danger && this.rng() < this.bskill) {
           const dir = this.blinkDir(s);
           if (dir && s.tick >= w.blinkReady && w.aether >= B.blink.aether) {
             cmds.push({ t: 'blink', dir });
@@ -136,7 +143,7 @@ export class WizardAI implements Bot {
           if (pl.feint) cmds.push({ t: 'drawCancel' });
           else cmds.push({ t: 'cast', spell: pl.fizzle ? null : pl.spell, tier: pl.tier });
           this.plan = null;
-          this.nextThink = s.tick + this.p.tempo[0] + Math.floor(this.rng() * (this.p.tempo[1] - this.p.tempo[0] + 1));
+          this.nextThink = s.tick + Math.round((this.p.tempo[0] + Math.floor(this.rng() * (this.p.tempo[1] - this.p.tempo[0] + 1))) * [1, 0.75, 0.55][this.phase - 1]!);
         }
         return cmds;
       }
@@ -145,9 +152,15 @@ export class WizardAI implements Bot {
     if (s.tick < this.nextThink) return cmds;
     this.nextThink = s.tick + 1;
 
+    // 0. arena: leave a burning lane, drift toward a crystal
+    const move = this.arenaMove(s);
+    if (move) {
+      cmds.push({ t: 'blink', dir: move });
+      return cmds;
+    }
     // 1. reactive dodges
     const danger = this.imminentDanger(s);
-    if (danger && this.rng() < this.p.blinkSkill && s.tick >= w.blinkReady && w.aether >= B.blink.aether) {
+    if (danger && this.rng() < this.bskill && s.tick >= w.blinkReady && w.aether >= B.blink.aether) {
       const dir = this.blinkDir(s);
       if (dir) {
         cmds.push({ t: 'blink', dir });
@@ -160,6 +173,23 @@ export class WizardAI implements Bot {
     // 3. offense
     this.pickOffense(s, cmds);
     return cmds;
+  }
+
+  private arenaMove(s: DuelState): -1 | 1 | 0 {
+    const w = s.w[this.me];
+    if (s.tick < w.blinkReady || w.aether < B.blink.aether + 6) return 0;
+    const step = (target: number): -1 | 1 | 0 => (target > w.lane ? 1 : target < w.lane ? -1 : 0);
+    const hz = s.hazard;
+    if (hz && hz.lane === w.lane && this.noticed('hz' + hz.until, s)) {
+      const safe = ([0, 1, 2] as const).filter((l) => l !== hz.lane && Math.abs(l - w.lane) === 1);
+      if (safe.length && this.rng() < 0.5 + this.bskill / 2) return step(safe[Math.floor(this.rng() * safe.length)]!);
+    }
+    const cr = s.crystal;
+    const chase = [0.25, 0.55, 0.85][['apprentice', 'adept', 'archmage'].indexOf(this.difficulty)]!;
+    if (cr && cr.lane !== w.lane && (!hz || cr.lane !== hz.lane) && this.noticed('cr' + cr.until, s) && this.rng() < chase * 0.08 && !this.imminentDanger(s)) {
+      return step(cr.lane);
+    }
+    return 0;
   }
 
   private imminentDanger(s: DuelState): boolean {
@@ -193,7 +223,7 @@ export class WizardAI implements Bot {
     const good = opts.filter((d) => !bad.has(w.lane + d));
     const pool = good.length ? good : opts;
     if (!pool.length) return 0;
-    if (this.rng() > this.p.blinkSkill + 0.1) return pool[Math.floor(this.rng() * pool.length)]!;
+    if (this.rng() > this.bskill + 0.1) return pool[Math.floor(this.rng() * pool.length)]!;
     pool.sort((a, b) => Math.abs(w.lane + a - 1) - Math.abs(w.lane + b - 1));
     return pool[0]!;
   }
@@ -289,7 +319,7 @@ export class WizardAI implements Bot {
     if (hasBothOrbs(s, me) && this.ready(s, 'eclipse')) {
       const foeCanWell = s.tick >= this.foeGravewellReady && fw.aether >= 30;
       const open = fw.state === 'staggered' || fw.state === 'exhausted' || fw.state === 'recovery';
-      if ((!foeCanWell || open || this.rng() < 0.3) && this.rng() < this.p.eclipseAmbition + (open ? 0.3 : 0)) {
+      if ((!foeCanWell || open || this.rng() < 0.3) && this.rng() < this.p.eclipseAmbition + (this.phase - 1) * 0.1 + (open ? 0.3 : 0)) {
         this.go(s, cmds, 'eclipse');
         return;
       }
@@ -316,6 +346,8 @@ export class WizardAI implements Bot {
     if (!holdsOrb(s, me, 'umbra')) add('umbra', 0.3 + (passive ? 0.4 : 0) + (holdsOrb(s, me, 'aurum') ? 0.5 * this.p.eclipseAmbition : 0));
 
     const hurt = w.vit < 55;
+    if (this.phase >= 2) add('starfall', 0.35 * (this.phase - 1));
+    if (this.phase >= 3) add('crescent', 0.3);
     add('dart', 0.4 + (wardUp ? 0.9 : 0));
     add('riptide', 0.3 + (fw.state === 'idle' ? 0.1 : 0));
     add('crescent', 0.4);

@@ -53,7 +53,7 @@ class Synth {
   }
 
   /** oscillator with exponential pitch glide and an attack/decay envelope */
-  osc(type: OscillatorType, f0: number, f1: number, dur: number, vol: number, o: { at?: number; attack?: number; lp?: number; pan?: number; wet?: number; rate?: number } = {}): void {
+  osc(type: OscillatorType, f0: number, f1: number, dur: number, vol: number, o: { at?: number; attack?: number; lp?: number; pan?: number; wet?: number; rate?: number; drive?: number } = {}): void {
     const { ctx } = this;
     const t = this.now() + (o.at ?? 0);
     const r = o.rate ?? 1;
@@ -67,11 +67,23 @@ class Synth {
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     let node: AudioNode = osc;
+    if (o.drive) {
+      const ws = ctx.createWaveShaper();
+      const k = o.drive * 60;
+      const curve = new Float32Array(256);
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * 2 - 1;
+        curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+      }
+      ws.curve = curve;
+      osc.connect(ws);
+      node = ws;
+    }
     if (o.lp) {
       const f = ctx.createBiquadFilter();
       f.type = 'lowpass';
       f.frequency.value = o.lp;
-      osc.connect(f);
+      node.connect(f);
       node = f;
     }
     node.connect(g);
@@ -100,6 +112,17 @@ class Synth {
     this.out(g, o.pan, o.wet);
     src.start(t, Math.random() * 1.5);
     src.stop(t + dur + 0.05);
+  }
+
+  /** low body hit: fast pitch drop plus a short click */
+  thump(f0: number, vol: number, dur = 0.35, o: { at?: number; wet?: number; pan?: number } = {}): void {
+    this.osc('sine', f0, Math.max(28, f0 * 0.28), dur, vol, { at: o.at, wet: o.wet ?? 0.15, pan: o.pan, attack: 0.003 });
+    this.noise(0.04, vol * 0.7, { at: o.at, type: 'highpass', f0: 1800, attack: 0.001 });
+  }
+
+  /** long dark reverb tail */
+  tail(dur: number, vol: number, o: { at?: number; f0?: number; f1?: number } = {}): void {
+    this.noise(dur, vol, { at: o.at, type: 'lowpass', f0: o.f0 ?? 1800, f1: o.f1 ?? 120, wet: 0.9, attack: 0.04 });
   }
 
   /** FM bell */
@@ -215,6 +238,42 @@ const SFX: Record<string, Maker> = {
   stormMark: mk((a, o) => { a.osc('sawtooth', 90, 90, 0.35, 0.05, { lp: 500, pan: o.pan }); a.noise(0.35, 0.05, { type: 'highpass', f0: 5000, pan: o.pan }); }),
   hit: mk((a) => a.osc('sine', 120, 50, 0.2, 0.16)),
 };
+
+Object.assign(SFX, {
+  // recognition stings: each school has its own timbre
+  recog_cinder: mk((a) => { a.thump(180, 0.12, 0.2); [0, 4, 7, 12].forEach((s2, i) => a.osc('sawtooth', 330 * 2 ** (s2 / 12), 330 * 2 ** (s2 / 12), 0.4, 0.07, { at: i * 0.045, lp: 2200, drive: 0.4 })); a.noise(0.4, 0.1, { f0: 1800, f1: 500, q: 0.7 }); }),
+  recog_storm: mk((a) => { a.osc('sawtooth', 2400, 220, 0.16, 0.1, { lp: 5000, drive: 0.7 }); a.noise(0.25, 0.16, { type: 'highpass', f0: 4500, f1: 1200 }); a.osc('square', 600, 2400, 0.12, 0.05, { at: 0.07 }); a.thump(120, 0.1, 0.25, { at: 0.1 }); }),
+  recog_gravewell: mk((a) => { a.osc('sawtooth', 80, 34, 1.0, 0.16, { lp: 320, attack: 0.2, drive: 0.5 }); a.osc('sine', 200, 55, 0.9, 0.12, { attack: 0.25 }); a.tail(1.2, 0.08); }),
+  recog_eclipse: mk((a) => { a.osc('sawtooth', 50, 120, 1.5, 0.18, { lp: 420, attack: 0.4, wet: 0.5, drive: 0.4 }); a.bell(523, 2.0, 0.08, { at: 0.1 }); a.bell(784, 2.0, 0.07, { at: 0.22 }); a.bell(1046, 2.0, 0.05, { at: 0.34 }); }),
+  // wind-ups: longer, tremolo'd risers so the opponent's charge is audible
+  windup_fire: mk((a) => { a.noise(0.5, 0.11, { f0: 400, f1: 2800, q: 0.9, attack: 0.3 }); a.osc('sawtooth', 90, 300, 0.5, 0.09, { lp: 1000, attack: 0.35, drive: 0.5 }); a.osc('sine', 60, 120, 0.5, 0.1, { attack: 0.3 }); }),
+  windup_storm: mk((a) => { for (let i = 0; i < 6; i++) a.osc('square', 400 + i * 160, 1800 + i * 200, 0.5, 0.025, { at: i * 0.07, lp: 3500 }); a.noise(0.55, 0.09, { type: 'highpass', f0: 3000, attack: 0.4 }); }),
+  windup_ice: mk((a) => { for (let i = 0; i < 5; i++) a.bell(1100 + i * 260, 0.7, 0.035, { at: i * 0.07 }); a.noise(0.6, 0.05, { type: 'highpass', f0: 6500, attack: 0.4 }); a.osc('sine', 200, 420, 0.5, 0.06, { attack: 0.3 }); }),
+  windup_grav: mk((a) => { a.osc('sawtooth', 40, 95, 0.9, 0.16, { lp: 260, attack: 0.6, drive: 0.5 }); a.noise(0.9, 0.08, { f0: 2400, f1: 120, q: 2.2, attack: 0.6 }); }),
+  // release / travel
+  release: mk((a, o) => { a.noise(0.35, 0.16, { f0: 300, f1: 3800, q: 0.7, pan: o.pan }); a.osc('sawtooth', 700, 120, 0.25, 0.1, { lp: 2200, drive: 0.3 }); a.thump(220, 0.14, 0.25); }),
+  // impacts: body hit + crack + tail
+  impact_cinder: mk((a, o) => { a.thump(170, 0.34, 0.4, { pan: o.pan }); a.noise(0.5, 0.2, { type: 'lowpass', f0: 3200, f1: 180, pan: o.pan }); a.noise(0.12, 0.2, { type: 'highpass', f0: 2500, f1: 900 }); a.tail(0.9, 0.09); }),
+  impact_storm: mk((a) => { a.noise(0.09, 0.4, { type: 'highpass', f0: 3500 }); a.thump(110, 0.36, 0.5); a.noise(1.6, 0.17, { type: 'lowpass', f0: 800, f1: 60, wet: 0.8, attack: 0.04 }); a.osc('sawtooth', 1800, 90, 0.35, 0.1, { lp: 3500, drive: 0.8 }); }),
+  impact_meteor: mk((a) => { a.thump(95, 0.5, 0.9, { wet: 0.4 }); a.noise(0.9, 0.26, { type: 'lowpass', f0: 3000, f1: 80, wet: 0.5 }); a.tail(1.6, 0.14); a.osc('sine', 48, 28, 1.3, 0.3); }),
+  impact_riptide: mk((a) => { a.noise(0.45, 0.2, { f0: 1600, f1: 220, q: 1.2 }); a.thump(240, 0.2, 0.3); for (let i = 0; i < 4; i++) a.bell(1600 + Math.random() * 900, 0.3, 0.04, { at: i * 0.03 }); }),
+  impact_crescent: mk((a) => { a.noise(0.2, 0.26, { type: 'highpass', f0: 3000, f1: 700 }); a.thump(150, 0.3, 0.35); a.bell(1500, 0.5, 0.07); a.osc('sawtooth', 1500, 300, 0.2, 0.08, { lp: 3000 }); }),
+  impact_dart: mk((a) => { a.noise(0.05, 0.22, { type: 'highpass', f0: 5500 }); a.bell(3000, 0.18, 0.08); a.thump(260, 0.14, 0.15); }),
+  impact_fang: mk((a) => { a.osc('sawtooth', 380, 70, 0.2, 0.16, { lp: 1400, drive: 0.6 }); a.thump(200, 0.22, 0.25); a.noise(0.1, 0.16, { f0: 2400, f1: 500 }); }),
+  impact_blast: mk((a) => { a.thump(200, 0.4, 0.4); a.bell(660, 0.7, 0.1); a.noise(0.25, 0.2, { f0: 1800, f1: 300 }); a.tail(0.7, 0.08); }),
+  damage: mk((a) => { a.thump(140, 0.34, 0.3); a.noise(0.2, 0.2, { type: 'lowpass', f0: 2400, f1: 250 }); a.osc('sawtooth', 220, 80, 0.2, 0.08, { lp: 800 }); }),
+  // arena + progression
+  riftWarn: mk((a) => { for (let i = 0; i < 3; i++) a.osc('square', 440, 440, 0.12, 0.07, { at: i * 0.2, lp: 1800 }); a.osc('sawtooth', 70, 55, 0.7, 0.1, { lp: 300, attack: 0.1 }); }),
+  riftOpen: mk((a) => { a.thump(70, 0.5, 0.8, { wet: 0.5 }); a.osc('sawtooth', 120, 40, 1.0, 0.16, { lp: 420, drive: 0.7, wet: 0.5 }); a.noise(1.0, 0.12, { type: 'lowpass', f0: 1800, f1: 120, wet: 0.6 }); }),
+  crystalSpawn: mk((a) => { [0, 7, 12, 19].forEach((s2, i) => a.bell(784 * 2 ** (s2 / 12), 1.2, 0.05, { at: i * 0.08 })); }),
+  crystal: mk((a) => { [0, 4, 7, 12, 16].forEach((s2, i) => a.bell(880 * 2 ** (s2 / 12), 0.9, 0.07, { at: i * 0.045 })); a.osc('sine', 300, 900, 0.3, 0.1); }),
+  phaseUp: mk((a) => { a.thump(60, 0.6, 1.0, { wet: 0.5 }); a.osc('sawtooth', 55, 110, 1.4, 0.2, { lp: 500, drive: 0.8, attack: 0.3, wet: 0.5 }); a.bell(196, 2.5, 0.1, { ratio: 1.41 }); a.bell(233, 2.5, 0.08, { ratio: 1.41, at: 0.15 }); }),
+  shatter: mk((a) => { a.noise(0.35, 0.3, { type: 'highpass', f0: 2500, f1: 9000 }); for (let i = 0; i < 8; i++) a.bell(2000 + Math.random() * 3200, 0.5, 0.05, { at: i * 0.025 }); a.thump(180, 0.3, 0.3); }),
+  perfectDodge: mk((a) => { a.noise(0.18, 0.14, { f0: 600, f1: 6000, q: 0.5 }); [0, 7, 12].forEach((s2, i) => a.bell(1318 * 2 ** (s2 / 12), 0.7, 0.07, { at: 0.05 + i * 0.05 })); }),
+  parry: mk((a) => { a.bell(3136, 0.8, 0.14, { ratio: 3.5 }); a.bell(2349, 0.8, 0.1, { ratio: 3.5, at: 0.04 }); a.noise(0.3, 0.18, { type: 'highpass', f0: 4000, f1: 10000 }); a.thump(200, 0.3, 0.3); }),
+  overcharge: mk((a) => { a.osc('sawtooth', 110, 440, 0.6, 0.12, { lp: 2500, drive: 0.5, attack: 0.2 }); [0, 4, 7, 12, 16].forEach((s2, i) => a.bell(660 * 2 ** (s2 / 12), 1.2, 0.07, { at: 0.2 + i * 0.06 })); }),
+  counterHit: mk((a) => { a.thump(160, 0.4, 0.35); a.noise(0.15, 0.3, { type: 'highpass', f0: 2500 }); a.bell(1200, 0.4, 0.09); }),
+});
 
 const LOOP_FACTORY: Record<string, (ctx: AudioContext, dest: AudioNode) => { rate: AudioParam | null; gain: GainNode; pan: StereoPannerNode; nodes: AudioScheduledSourceNode[] }> = {};
 
@@ -401,6 +460,15 @@ export class SynthAudio implements AudioManager {
     this.tens = Math.max(0, Math.min(1, t));
   }
 
+  private padVoices: { o: OscillatorNode; idx: number }[] = [];
+  private step = 0;
+  private static CHORDS = [
+    [110, 164.8, 220, 261.6, 329.6],
+    [87.3, 130.8, 174.6, 220, 261.6],
+    [130.8, 196, 261.6, 329.6, 392],
+    [98, 146.8, 196, 246.9, 293.7],
+  ];
+
   music(mode: 'off' | 'menu' | 'duel'): void {
     if (mode === this.musicMode) return;
     this.musicMode = mode;
@@ -409,30 +477,36 @@ export class SynthAudio implements AudioManager {
     clearInterval(this.musicTimer);
     const ctx = this.ctx;
     if (!ctx || mode === 'off') return;
-    // pad: slow suspended chord through a breathing low-pass filter
     const out = ctx.createGain();
     out.gain.value = 0;
     out.gain.setTargetAtTime(1, ctx.currentTime, 1.2);
     const f = ctx.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.value = 700; f.Q.value = 0.8;
+    f.type = 'lowpass';
+    f.frequency.value = mode === 'menu' ? 600 : 900;
+    f.Q.value = 0.8;
     const lfo = ctx.createOscillator();
     const lfoG = ctx.createGain();
-    lfo.frequency.value = 0.07; lfoG.gain.value = 380;
-    lfo.connect(lfoG); lfoG.connect(f.frequency);
-    f.connect(out); out.connect(this.musicBus);
-    const notes = mode === 'menu' ? [110, 164.8, 220, 246.9, 329.6] : [98, 146.8, 196, 233.1, 293.7];
+    lfo.frequency.value = 0.07;
+    lfoG.gain.value = 380;
+    lfo.connect(lfoG);
+    lfoG.connect(f.frequency);
+    f.connect(out);
+    out.connect(this.musicBus);
     const oscs: OscillatorNode[] = [lfo];
-    notes.forEach((n, i) => {
+    this.padVoices = [];
+    SynthAudio.CHORDS[0]!.forEach((n, i) => {
       for (const det of [-6, 6]) {
         const o = ctx.createOscillator();
         o.type = i % 2 ? 'triangle' : 'sawtooth';
         o.frequency.value = n;
         o.detune.value = det;
         const g = ctx.createGain();
-        g.gain.value = 0.045;
-        o.connect(g); g.connect(f);
+        g.gain.value = 0.04;
+        o.connect(g);
+        g.connect(f);
         o.start();
         oscs.push(o);
+        this.padVoices.push({ o, idx: i });
       }
     });
     lfo.start();
@@ -442,21 +516,40 @@ export class SynthAudio implements AudioManager {
         setTimeout(() => oscs.forEach((o) => { try { o.stop(); } catch { /* stopped */ } }), 1800);
       },
     };
-    if (mode === 'duel') {
-      this.beat = 0;
-      this.musicTimer = window.setInterval(() => this.pulse(), 360);
-    }
+    this.step = 0;
+    this.musicTimer = window.setInterval(() => this.tick16(), mode === 'duel' ? 150 : 260);
   }
 
-  /** adaptive pulse layer: fades in with tension */
-  private pulse(): void {
+  /** 16th-note sequencer: pad chord changes every bar, bass, arpeggio, and drums that fade in with tension */
+  private tick16(): void {
     if (!this.ctx || settings.mute) return;
     const a = this.synth;
     const k = this.tens;
-    this.beat++;
-    const vol = 0.04 + k * 0.12;
-    if (this.beat % 2 === 0) a.osc('sine', 90, 38, 0.22, vol, { wet: 0.1 });
-    if (k > 0.25 && this.beat % 2 === 1) a.noise(0.05, 0.015 + k * 0.03, { type: 'highpass', f0: 7000 });
-    if (k > 0.55 && this.beat % 4 === 3) a.osc('triangle', 196, 196, 0.2, 0.03 + k * 0.03, { lp: 900 });
+    const duel = this.musicMode === 'duel';
+    const st = this.step++;
+    const bar = Math.floor(st / 16) % 4;
+    const chord = SynthAudio.CHORDS[bar]!;
+    const pos = st % 16;
+    if (pos === 0) {
+      const t = this.ctx.currentTime;
+      for (const v of this.padVoices) v.o.frequency.setTargetAtTime(chord[v.idx]!, t, 0.25);
+    }
+    // bass on the beat
+    if (duel && pos % 4 === 0) a.osc('sawtooth', chord[0]! / 2, chord[0]! / 2, 0.4, 0.09 + k * 0.05, { lp: 380, drive: 0.3 });
+    // arpeggio on the 8ths; faster and brighter with tension
+    const arp = [0, 2, 4, 2, 3, 2, 4, 1];
+    if (pos % 2 === 0 && (duel ? k > 0.12 || pos % 4 === 0 : pos % 4 === 0)) {
+      const n = chord[arp[(pos / 2) % arp.length]!]! * 2;
+      a.osc(duel ? 'square' : 'triangle', n, n, duel ? 0.22 : 0.9, duel ? 0.018 + k * 0.025 : 0.025, { lp: duel ? 1800 + k * 2200 : 1400, wet: 0.5 });
+    }
+    if (!duel) return;
+    // drums
+    if (pos % 8 === 0) a.thump(95, 0.1 + k * 0.1, 0.22, { wet: 0.08 });
+    if (k > 0.25 && pos % 4 === 2) a.noise(0.05, 0.02 + k * 0.03, { type: 'highpass', f0: 7000 });
+    if (k > 0.45 && pos % 8 === 4) {
+      a.noise(0.14, 0.05 + k * 0.04, { type: 'bandpass', f0: 1800, q: 0.8 });
+      a.osc('triangle', 220, 140, 0.08, 0.05);
+    }
+    if (k > 0.7 && pos % 8 === 6) a.thump(95, 0.08, 0.15);
   }
 }
