@@ -19,9 +19,18 @@ interface Snap {
 
 const urlStore = store<string>('server.url', '');
 
+/** Where the multiplayer server lives: ?server=wss://host in the link, else what the player last used,
+ *  else the VITE_SIGILFALL_SERVER build setting, else port 2567 on the page's own host (dev). */
 function defaultUrl(): string {
+  const fromLink = new URLSearchParams(location.search).get('server');
+  if (fromLink && /^wss?:\/\//.test(fromLink)) {
+    urlStore.set(fromLink);
+    return fromLink;
+  }
   const saved = urlStore.get();
   if (saved) return saved;
+  const built = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_SIGILFALL_SERVER;
+  if (built) return built;
   const secure = location.protocol === 'https:';
   return `${secure ? 'wss' : 'ws'}://${location.hostname || 'localhost'}:2567`;
 }
